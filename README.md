@@ -1,6 +1,8 @@
-# SISAT — Sistema de Control de Asistencia
+# SATEC — Sistema de Asistencia Técnico
 
 Aplicación de **escritorio para PC**. Autor: **WAMBOO TIC**.
+
+No confundir con **SISAT**, que es el sistema web. SATEC es el programa de escritorio.
 
 Control de relojes biométricos ZKTeco, asistencia multi-sede, tardanzas, Excel y reportes. Los datos quedan en este equipo (`data/attendance.db`).
 
@@ -26,7 +28,7 @@ Acceso inicial: usuario `admin` / contraseña `admin123`. Cámbiela al entrar.
 
 ## Actualizar desde GitHub
 
-1. Suba el código con `PUBLICAR_GITHUB.bat` al repo `https://github.com/wamboo5610/SISAT`.
+1. Suba el código con `PUBLICAR_GITHUB.bat` al repo `https://github.com/wamboo5610/SATEC`.
 2. En cada PC: menú **Sistema** → **Buscar actualización** → **Instalar versión nueva**.
 3. Si el repositorio es privado, pegue un token de GitHub (permiso `repo`) en esa misma pantalla.
 
@@ -38,16 +40,6 @@ En **Sistema** (o en Relojes):
 
 - **Exportar base de datos** — ZIP con `attendance.db` y cuentas.
 - **Restaurar base de datos** — reemplaza los datos actuales (solo administrador).
-
-## Módulos
-
-- Relojes biométricos, asistencia y tardanzas
-- Empleados y horarios
-- Importar Excel y tardanzas RRHH
-- Descarga local sin internet
-- Conexión remota ADMS
-- Usuarios del sistema
-- Sistema: versión, GitHub, exportar/restaurar
 
 ## Autor
 

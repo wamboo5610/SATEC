@@ -7,6 +7,8 @@ data/attendance.db-*
 data/auth.json
 data/webview/
 data/*.log
+data/satec.log
+data/sisat.log
 data/_update_stage/
 data/_restore_tmp/
 data/update.json

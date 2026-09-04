@@ -1,7 +1,7 @@
 [project]
-name = "sisat"
-version = "2.2.0"
-description = "Sistema de Control de Asistencia — aplicación de escritorio para PC. Autor: WAMBOO TIC."
+name = "satec"
+version = "2.3.0"
+description = "SATEC — Sistema de Asistencia Técnico, aplicación de escritorio para PC. Autor: WAMBOO TIC."
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.115.6",

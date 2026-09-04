@@ -44,7 +44,7 @@ class DesktopBridge:
             return str(result[0])
         return None
 
-    def save_file(self, filename: str = "sisat_base_datos.zip") -> str | None:
+    def save_file(self, filename: str = "satec_base_datos.zip") -> str | None:
         webview, window = _window()
         dialog = _dialog("save")
         if window is None or dialog is None:
@@ -54,7 +54,7 @@ class DesktopBridge:
             dialog,
             directory=documents,
             save_filename=filename,
-            file_types=("Respaldo SISAT (*.zip)",),
+            file_types=("Respaldo SATEC (*.zip)",),
         )
         if not result:
             return None
@@ -68,7 +68,7 @@ class DesktopBridge:
             return None
         result = window.create_file_dialog(
             dialog,
-            file_types=("Respaldo SISAT (*.zip)",),
+            file_types=("Respaldo SATEC (*.zip)",),
         )
         if result:
             return str(result[0])

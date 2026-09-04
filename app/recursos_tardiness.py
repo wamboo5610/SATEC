@@ -21,12 +21,12 @@ LISTA_HEADER_MARKERS = {"n°", "nº", "n", "apellidos y nombres", "apellidos y n
 
 
 def get_lista_dir() -> Path:
-    custom = os.environ.get("SISAT_RECURSOS_LISTA_DIR", "").strip()
+    custom = (os.environ.get("SATEC_RECURSOS_LISTA_DIR") or os.environ.get("SISAT_RECURSOS_LISTA_DIR") or "").strip()
     return Path(custom) if custom else DEFAULT_LISTA_DIR
 
 
 def get_reportes_dir() -> Path:
-    custom = os.environ.get("SISAT_RECURSOS_REPORTES_DIR", "").strip()
+    custom = (os.environ.get("SATEC_RECURSOS_REPORTES_DIR") or os.environ.get("SISAT_RECURSOS_REPORTES_DIR") or "").strip()
     return Path(custom) if custom else DEFAULT_REPORTES_DIR
 
 
@@ -244,7 +244,7 @@ def _match_filename_sede(filename: str) -> str | None:
 
 
 def build_user_sede_hints() -> dict[str, int]:
-    """Sede más frecuente por empleado según relojes / importaciones previas en SISAT."""
+    """Sede más frecuente por empleado según relojes / importaciones previas en SATEC."""
     counts: dict[str, dict[int, int]] = {}
     device_map = db.get_device_serial_map()
     with db.get_conn() as conn:
@@ -270,7 +270,7 @@ def resolve_report_sede(
     user_sede_hints: dict[str, int],
     user_id: str | None = None,
 ) -> tuple[int | None, str]:
-    """Resuelve sede SISAT para un reporte (por archivo o por empleado en sedes varias)."""
+    """Resuelve sede SATEC para un reporte (por archivo o por empleado en sedes varias)."""
     sede_names = {name.lower(): (sid, name) for name, sid in sede_name_to_id.items()}
     mapped = _match_filename_sede(filename)
     if mapped:
@@ -345,7 +345,7 @@ def _attach_schedule_summary(meta: dict, schedules_by_sede: dict[int, dict]) -> 
         })
     meta["schedules_applied"] = rows
     meta["monthly_tolerance_minutes"] = al.MONTHLY_TOLERANCE_MINUTES
-    meta["uses_sisat_rules"] = True
+    meta["uses_satec_rules"] = True
 
 
 def tag_records_with_sede(

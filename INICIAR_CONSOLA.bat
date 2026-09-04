@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title SISAT — consola  |  WAMBOO TIC
+title SATEC — consola  |  WAMBOO TIC
 if not exist "venv\Scripts\python.exe" (
     echo Primero ejecute INSTALAR.bat
     pause

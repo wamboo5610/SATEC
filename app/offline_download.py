@@ -96,7 +96,7 @@ def _build_snapshot(
         u["sede_name"] = dev.get("sede_name", sede_name)
 
     meta = {
-        "app": "SISAT",
+        "app": "SATEC",
         "version": "2.0.0",
         "downloaded_at": datetime.now().isoformat(),
         "sede_name": sede_name,

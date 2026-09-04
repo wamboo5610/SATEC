@@ -1,4 +1,4 @@
-"""SISAT — aplicación de escritorio para PC. Autor: WAMBOO TIC."""
+"""SATEC — aplicación de escritorio para PC. Autor: WAMBOO TIC."""
 
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 os.chdir(ROOT)
-os.environ["SISAT_DESKTOP"] = "1"
+os.environ["SATEC_DESKTOP"] = "1"
 
-LOG_PATH = ROOT / "data" / "sisat.log"
+LOG_PATH = ROOT / "data" / "satec.log"
 ENGINE_ERROR: list[str] = []
 
 
@@ -61,7 +61,7 @@ def _port_open(port: int) -> bool:
         return sock.connect_ex(("127.0.0.1", port)) == 0
 
 
-def _is_sisat(port: int) -> bool:
+def _is_satec(port: int) -> bool:
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/auth/status", timeout=0.6) as response:
             return response.status == 200
@@ -72,7 +72,7 @@ def _is_sisat(port: int) -> bool:
 def pick_port() -> tuple[int, bool]:
     """Devuelve (puerto, ya_estaba_corriendo)."""
     if _port_open(PREFERRED_PORT):
-        if _is_sisat(PREFERRED_PORT):
+        if _is_satec(PREFERRED_PORT):
             return PREFERRED_PORT, True
         for port in range(PREFERRED_PORT + 1, PREFERRED_PORT + 21):
             if not _port_open(port):
@@ -100,7 +100,7 @@ def wait_ready(port: int, timeout: float = 20.0, thread: threading.Thread | None
 
 def start_engine(port: int) -> None:
     _ensure_stdio()
-    os.environ["SISAT_PORT"] = str(port)
+    os.environ["SATEC_PORT"] = str(port)
     try:
         from app import auth
         from app import database as db
@@ -265,7 +265,7 @@ def main() -> int:
     try:
         splash.set_status("Buscando puerto local…")
         port, already = pick_port()
-        os.environ["SISAT_PORT"] = str(port)
+        os.environ["SATEC_PORT"] = str(port)
         if not already:
             splash.set_status("Arrancando motor de asistencia…")
             thread = threading.Thread(target=start_engine, args=(port,), daemon=True)
@@ -278,7 +278,7 @@ def main() -> int:
                     last = ENGINE_ERROR[-1].strip().splitlines()
                     detail = "\n\n" + "\n".join(last[-6:])
                 _error_dialog(
-                    "No se pudo iniciar el motor local de SISAT."
+                    "No se pudo iniciar el motor local de SATEC."
                     f"{detail}\n\n"
                     "Si ya hay otra ventana abierta, ciérrela e intente de nuevo.\n"
                     f"Registro: {LOG_PATH}"
@@ -293,7 +293,7 @@ def main() -> int:
         return open_desktop(port)
     except Exception as exc:
         splash.close()
-        _error_dialog(f"Error al iniciar SISAT:\n{exc}")
+        _error_dialog(f"Error al iniciar SATEC:\n{exc}")
         return 1
 
 

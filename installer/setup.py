@@ -1,4 +1,4 @@
-"""Instalador gráfico SISAT — WAMBOO TIC."""
+"""Instalador gráfico SATEC — WAMBOO TIC."""
 
 from __future__ import annotations
 
@@ -21,9 +21,9 @@ PAYLOAD = HERE / "payload"
 if not PAYLOAD.exists():
     PAYLOAD = HERE.parent
 
-APP_TITLE = "SISAT — Sistema de Control de Asistencia"
+APP_TITLE = "SATEC — Sistema de Asistencia Técnico"
 AUTHOR = "WAMBOO TIC"
-DEFAULT_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "WAMBOOTIC" / "SISAT"
+DEFAULT_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "WAMBOOTIC" / "SATEC"
 
 
 def find_python() -> str | None:
@@ -78,7 +78,7 @@ class Installer(tk.Tk):
 
     def _build(self) -> None:
         pad = {"padx": 24, "pady": 4}
-        tk.Label(self, text="SISAT", fg="#F3FAF6", bg="#0E2A22", font=("Segoe UI", 22, "bold")).pack(anchor="w", **pad)
+        tk.Label(self, text="SATEC", fg="#F3FAF6", bg="#0E2A22", font=("Segoe UI", 22, "bold")).pack(anchor="w", **pad)
         tk.Label(self, text=APP_TITLE, fg="#D4E2DA", bg="#0E2A22", font=("Segoe UI", 11)).pack(anchor="w", padx=24)
         tk.Label(self, text=f"Autor  {AUTHOR}  ·  Aplicación de escritorio para PC", fg="#C4A04A", bg="#0E2A22", font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=24, pady=(4, 16))
 
@@ -183,9 +183,9 @@ class Installer(tk.Tk):
             desktop = Path.home() / "Desktop"
             if not desktop.exists():
                 desktop = Path.home() / "Escritorio"
-            create_shortcut(start, desktop / "SISAT WAMBOO TIC.lnk", dest, icon, APP_TITLE)
+            create_shortcut(start, desktop / "SATEC WAMBOO TIC.lnk", dest, icon, APP_TITLE)
             start_menu = Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "WAMBOO TIC"
-            create_shortcut(start, start_menu / "SISAT.lnk", dest, icon, APP_TITLE)
+            create_shortcut(start, start_menu / "SATEC.lnk", dest, icon, APP_TITLE)
             self._write_uninstall(dest)
             self._set_status("Instalación lista.")
             self.after(0, lambda: self._done(dest))
@@ -201,10 +201,10 @@ class Installer(tk.Tk):
                 [
                     "@echo off",
                     "chcp 65001 >nul",
-                    "echo Esto elimina SISAT de este equipo. La carpeta de datos se conserva si elige N.",
+                    "echo Esto elimina SATEC de este equipo. La carpeta de datos se conserva si elige N.",
                     "pause",
-                    f'del "%USERPROFILE%\\Desktop\\SISAT WAMBOO TIC.lnk" >nul 2>&1',
-                    f'del "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\WAMBOO TIC\\SISAT.lnk" >nul 2>&1',
+                    f'del "%USERPROFILE%\\Desktop\\SATEC WAMBOO TIC.lnk" >nul 2>&1',
+                    f'del "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\WAMBOO TIC\\SATEC.lnk" >nul 2>&1',
                     f'cd /d "{dest.parent}"',
                     f'rmdir /s /q "{dest.name}"',
                     "echo Desinstalado.",
@@ -216,7 +216,7 @@ class Installer(tk.Tk):
         )
 
     def _done(self, dest: Path) -> None:
-        if messagebox.askyesno(AUTHOR, f"SISAT se instaló en:\n{dest}\n\n¿Abrir ahora?"):
+        if messagebox.askyesno(AUTHOR, f"SATEC se instaló en:\n{dest}\n\n¿Abrir ahora?"):
             subprocess.Popen(["cmd.exe", "/c", str(dest / "INICIAR.bat")], cwd=str(dest))
         self.destroy()
 

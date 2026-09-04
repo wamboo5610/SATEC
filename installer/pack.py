@@ -1,4 +1,4 @@
-"""Empaqueta el instalador ZIP de SISAT — WAMBOO TIC."""
+"""Empaqueta el instalador ZIP de SATEC — WAMBOO TIC."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.version import APP_VERSION, AUTHOR  # noqa: E402
+from app.version import APP_NAME, APP_VERSION, AUTHOR  # noqa: E402
 
 DIST = ROOT / "dist"
 SKIP_DIRS = {
@@ -57,7 +57,7 @@ def _copy_tree(src: Path, dest: Path) -> None:
 
 
 def build() -> Path:
-    name = f"SISAT-{APP_VERSION}-Instalador-{AUTHOR.replace(' ', '-')}"
+    name = f"{APP_NAME}-{APP_VERSION}-Instalador-{AUTHOR.replace(' ', '-')}"
     out_dir = DIST / name
     if DIST.exists():
         shutil.rmtree(out_dir, ignore_errors=True)
@@ -82,7 +82,7 @@ def build() -> Path:
                 "@echo off",
                 "chcp 65001 >nul",
                 "cd /d \"%~dp0\"",
-                "title Instalar SISAT — WAMBOO TIC",
+                "title Instalar SATEC — WAMBOO TIC",
                 "where python >nul 2>nul",
                 "if errorlevel 1 (",
                 "  echo No se encontro Python 3.12 o superior.",
@@ -99,7 +99,7 @@ def build() -> Path:
         encoding="utf-8",
     )
     (out_dir / "LEAME.txt").write_text(
-        f"SISAT {APP_VERSION} — {AUTHOR}\n\n"
+        f"SATEC {APP_VERSION} — {AUTHOR}\n\n"
         "1. Instale Python 3.12 o superior (con PATH).\n"
         "2. Ejecute SETUP.bat\n"
         "3. Acceso inicial: admin / admin123\n"

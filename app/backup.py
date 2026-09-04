@@ -78,11 +78,11 @@ def build_backup_zip() -> tuple[io.BytesIO, str]:
             "version": APP_VERSION,
             "app": APP_NAME,
             "author": AUTHOR,
-            "kind": "sisat-database",
+            "kind": "satec-database",
         }
         zf.writestr("backup_meta.json", json.dumps(meta, indent=2, ensure_ascii=False))
     buf.seek(0)
-    fname = f"sisat_base_datos_{datetime.now().strftime('%Y%m%d_%H%M')}.zip"
+    fname = f"satec_base_datos_{datetime.now().strftime('%Y%m%d_%H%M')}.zip"
     return buf, fname
 
 

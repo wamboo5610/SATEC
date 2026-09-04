@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title Instalar SISAT — WAMBOO TIC
+title Instalar SATEC — WAMBOO TIC
 
 echo =====================================================
-echo  SISAT  Sistema de Control de Asistencia  v2.2
+echo  SATEC  Sistema de Asistencia Tecnico  v2.3
 echo  Aplicacion de escritorio para PC
 echo  Autor: WAMBOO TIC
 echo =====================================================
@@ -44,11 +44,11 @@ if errorlevel 1 (
 )
 
 powershell -NoProfile -Command ^
-  "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop') + '\SISAT WAMBOO TIC.lnk'); ^
+  "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop') + '\SATEC WAMBOO TIC.lnk'); ^
    $s.TargetPath='%~dp0INICIAR.bat'; ^
    $s.WorkingDirectory='%~dp0'; ^
    $s.IconLocation='%~dp0assets\icon.ico'; ^
-   $s.Description='SISAT - Sistema de Control de Asistencia - WAMBOO TIC'; ^
+   $s.Description='SATEC - Sistema de Asistencia Tecnico - WAMBOO TIC'; ^
    $s.Save()"
 
 echo.

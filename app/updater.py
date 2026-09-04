@@ -55,7 +55,7 @@ def load_settings() -> dict:
     data = {
         "repo": f"{GITHUB_OWNER}/{GITHUB_REPO}",
         "branch": GITHUB_BRANCH,
-        "github_token": os.environ.get("SISAT_GITHUB_TOKEN", "").strip(),
+        "github_token": (os.environ.get("SATEC_GITHUB_TOKEN") or os.environ.get("SISAT_GITHUB_TOKEN") or "").strip(),
     }
     path = settings_path()
     if path.exists():
@@ -116,7 +116,7 @@ def is_newer(remote: str, local: str) -> bool:
 def _headers(token: str) -> dict[str, str]:
     headers = {
         "Accept": "application/vnd.github+json",
-        "User-Agent": "SISAT-WAMBOOTIC-Updater",
+        "User-Agent": "SATEC-WAMBOOTIC-Updater",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     if token:
@@ -279,7 +279,7 @@ def download_and_stage(download_url: str | None = None) -> dict:
     if stage.exists():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
-    tmp = Path(tempfile.mkdtemp(prefix="sisat-upd-"))
+    tmp = Path(tempfile.mkdtemp(prefix="satec-upd-"))
     try:
         zip_path = tmp / "update.zip"
         zip_path.write_bytes(raw)
@@ -315,7 +315,7 @@ def _write_apply_script(stage: Path, pid: int) -> Path:
         f"set ROOT={root}",
         f"set STAGE={stage}",
         f"set PID={pid}",
-        "echo Aplicando actualizacion SISAT...",
+        "echo Aplicando actualizacion SATEC...",
         "timeout /t 2 /nobreak >nul",
         "taskkill /PID %PID% /F >nul 2>&1",
         "timeout /t 2 /nobreak >nul",
@@ -366,5 +366,5 @@ def apply_and_restart() -> dict:
     return {
         **info,
         "restarting": True,
-        "message": f"Descargada la versión {info.get('remote_version')}. SISAT se reiniciará para aplicarla. La base de datos no se toca.",
+        "message": f"Descargada la versión {info.get('remote_version')}. SATEC se reiniciará para aplicarla. La base de datos no se toca.",
     }

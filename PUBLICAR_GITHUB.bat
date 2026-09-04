@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title Publicar SISAT en GitHub — WAMBOO TIC
+title Publicar SATEC en GitHub — WAMBOO TIC
 
 set GIT=
 if exist "C:\Program Files\Git\cmd\git.exe" set "GIT=C:\Program Files\Git\cmd\git.exe"
@@ -15,21 +15,21 @@ if "%GIT%"=="" (
     exit /b 1
 )
 
-echo Repositorio: https://github.com/wamboo5610/SISAT
+echo Repositorio: https://github.com/wamboo5610/SATEC
 echo.
-echo 1. Cree el repo SISAT en GitHub si aun no existe (publico o privado).
+echo 1. Cree el repo SATEC en GitHub si aun no existe (publico o privado).
 echo 2. Este script sube el codigo. La base de datos local NO se sube.
 echo.
 
 if not exist ".git" (
     "%GIT%" init
     "%GIT%" remote remove origin >nul 2>nul
-    "%GIT%" remote add origin https://github.com/wamboo5610/SISAT.git
+    "%GIT%" remote add origin https://github.com/wamboo5610/SATEC.git
     "%GIT%" branch -M main
 )
 
-set /p MSG="Mensaje del commit (Enter = Actualizacion SISAT): "
-if "%MSG%"=="" set MSG=Actualizacion SISAT
+set /p MSG="Mensaje del commit (Enter = Actualizacion SATEC): "
+if "%MSG%"=="" set MSG=Actualizacion SATEC
 
 "%GIT%" add -A
 "%GIT%" commit -m "%MSG%"
@@ -38,11 +38,11 @@ if errorlevel 1 (
 )
 "%GIT%" push -u origin main
 if errorlevel 1 (
-    echo Error al subir. Inicie sesion en GitHub o cree el repositorio SISAT.
+    echo Error al subir. Inicie sesion en GitHub o cree el repositorio SATEC.
     pause
     exit /b 1
 )
 echo.
-echo Listo. En SISAT: Sistema - Buscar actualizacion.
+echo Listo. En SATEC: Sistema - Buscar actualizacion.
 echo Si el repo es privado, pega un token (permiso repo) en esa pantalla.
 pause

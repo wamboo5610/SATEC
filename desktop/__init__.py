@@ -1,1 +1,1 @@
-"""Capa de escritorio SISAT — WAMBOO TIC."""
+"""Capa de escritorio SATEC — WAMBOO TIC."""

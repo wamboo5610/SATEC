@@ -1,4 +1,4 @@
-"""Lógica de marcaciones para Sistema de Control de Asistencia."""
+"""Lógica de marcaciones para SATEC — Sistema de Asistencia Técnico."""
 
 from collections import defaultdict
 from datetime import datetime, timedelta

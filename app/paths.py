@@ -11,7 +11,7 @@ IS_VERCEL = os.environ.get("VERCEL") == "1"
 
 
 def is_desktop() -> bool:
-    return os.environ.get("SISAT_DESKTOP") == "1"
+    return os.environ.get("SATEC_DESKTOP") == "1" or os.environ.get("SISAT_DESKTOP") == "1"
 
 
 def assets_dir() -> Path:
@@ -29,7 +29,7 @@ def login_bg_path() -> Path:
 
 
 def get_listen_port() -> int:
-    raw = os.environ.get("SISAT_PORT", "8000").strip()
+    raw = (os.environ.get("SATEC_PORT") or os.environ.get("SISAT_PORT") or "8000").strip()
     try:
         port = int(raw)
     except ValueError:

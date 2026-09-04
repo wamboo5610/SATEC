@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SISAT — Sistema de Control de Asistencia | WAMBOO TIC</title>
+  <title>SATEC — Sistema de Asistencia Técnico | WAMBOO TIC</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/theme.css">
   <style>
@@ -259,8 +259,8 @@
   <aside class="sidebar" id="sidebar">
     <button class="sidebar-close" id="sidebar-close" aria-label="Cerrar menú">✕</button>
     <div class="logo">
-      <img class="logo-icon-img" src="/assets/icon.png" alt="SISAT">
-      <div><h1>SISAT</h1><span>Asistencia</span><div class="logo-sub">Relojes biométricos</div></div>
+      <img class="logo-icon-img" src="/assets/icon.png" alt="SATEC">
+      <div><h1>SATEC</h1><span>Asistencia</span><div class="logo-sub">Relojes biométricos</div></div>
     </div>
     <div class="nav-section">Menú</div>
     <nav class="nav">
@@ -319,7 +319,7 @@
     <div class="sidebar-footer">
       <div class="author-kicker">Autor</div>
       <div class="author-name">WAMBOO TIC</div>
-      <div class="author-sub">Escritorio para PC · v2.2</div>
+      <div class="author-sub">Escritorio para PC · v2.3</div>
     </div>
   </aside>
 
@@ -370,7 +370,7 @@
     <section class="page active" id="page-dashboard">
       <div class="home-hero">
         <div class="welcome-card">
-          <div class="eyebrow">SISAT · WAMBOO TIC</div>
+          <div class="eyebrow">SATEC · WAMBOO TIC</div>
           <h2>Hola, <span id="welcome-name">usuario</span></h2>
           <p>Elige un módulo para continuar. Sincroniza relojes, revisa asistencia o genera reportes.</p>
         </div>
@@ -894,7 +894,7 @@
       <div class="alert alert-info">
         <strong>Carpetas:</strong> elige la carpeta del <strong>listado RRHH</strong> y la de los <strong>reportes del reloj</strong>
         (por defecto en <code>Downloads\recursos\lista</code> y <code>Downloads\recursos\reportes</code>).
-        Empareja por <strong>DNI</strong> y calcula tardanzas con las <strong>mismas reglas de SISAT</strong>:
+        Empareja por <strong>DNI</strong> y calcula tardanzas con las <strong>mismas reglas de SATEC</strong>:
         horario por sede (entrada, almuerzo, tolerancias), días laborables, feriados, ventanas de marcación y
         <strong>20 min de tolerancia mensual</strong> por empleado.
         <span id="rec-schedules-note" style="display:block;margin-top:8px"></span>
@@ -925,7 +925,7 @@
           </div>
           <div class="form-group">
             <label>Forzar horario de sede (opcional)</label>
-            <select id="rec-sede"><option value="">Automático — usa horarios configurados en SISAT</option></select>
+            <select id="rec-sede"><option value="">Automático — usa horarios configurados en SATEC</option></select>
           </div>
           <div class="form-group">
             <label>Etiqueta manual (solo si fuerzas sede)</label>
@@ -1252,7 +1252,7 @@
     <section class="page" id="page-system">
       <div class="page-header">
         <h2>Sistema</h2>
-        <p>Actualiza SISAT desde GitHub y exporta o restaura la base de datos. Autor: WAMBOO TIC</p>
+        <p>Actualiza SATEC desde GitHub y exporta o restaura la base de datos. Autor: WAMBOO TIC</p>
       </div>
       <div class="grid-2">
         <div class="card">
@@ -1271,7 +1271,7 @@
               Si el repo es privado, crea un token en GitHub (permiso <code>repo</code>) y pégalo aquí.
               No se sube a internet: queda solo en este PC.
             </p>
-            <div class="form-group"><label>Repositorio</label><input id="sys-repo" placeholder="wamboo5610/SISAT"></div>
+            <div class="form-group"><label>Repositorio</label><input id="sys-repo" placeholder="wamboo5610/SATEC"></div>
             <div class="form-group"><label>Rama</label><input id="sys-branch" placeholder="main"></div>
             <div class="form-group"><label>Token GitHub (opcional)</label><input id="sys-token" type="password" placeholder="ghp_…" autocomplete="off"></div>
             <button class="btn btn-outline btn-sm" type="button" onclick="saveUpdateSettings()">💾 Guardar conexión GitHub</button>
@@ -1361,17 +1361,17 @@
 <div class="modal" id="about-modal">
   <div class="modal-card">
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
-      <img src="/assets/icon.png" alt="SISAT" style="width:56px;height:56px;border-radius:16px">
+      <img src="/assets/icon.png" alt="SATEC" style="width:56px;height:56px;border-radius:16px">
       <div>
-        <h3 style="margin:0">SISAT</h3>
-        <p style="font-size:13px;color:var(--muted);margin:4px 0 0">Sistema de Control de Asistencia</p>
+        <h3 style="margin:0">SATEC</h3>
+        <p style="font-size:13px;color:var(--muted);margin:4px 0 0">Sistema de Asistencia Técnico</p>
       </div>
     </div>
     <p style="font-size:13px;line-height:1.6;color:var(--text);margin-bottom:12px">
       Aplicación de escritorio para PC. Control de relojes biométricos ZKTeco,
       asistencia multi-sede, tardanzas y reportes.
     </p>
-    <p style="font-size:13px;margin-bottom:4px"><strong>Versión</strong> <span id="about-version">2.2.0</span></p>
+    <p style="font-size:13px;margin-bottom:4px"><strong>Versión</strong> <span id="about-version">2.3.0</span></p>
     <p style="font-size:13px;margin-bottom:4px"><strong>Autor</strong> WAMBOO TIC</p>
     <p style="font-size:12px;color:var(--muted);margin-top:12px">Las marcaciones quedan guardadas en este equipo. Cerrar la ventana no borra la base de datos.</p>
     <div class="modal-actions">
@@ -2670,7 +2670,7 @@ async function loadRecursosPage(opts = {}) {
     }
     const sedeSel = document.getElementById('rec-sede');
     if (sedeSel && !opts.keepSelections) {
-      sedeSel.innerHTML = '<option value="">Automático — usa horarios configurados en SISAT</option>' +
+      sedeSel.innerHTML = '<option value="">Automático — usa horarios configurados en SATEC</option>' +
         sedes.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     }
     const statusEl = document.getElementById('rec-status');
@@ -3487,7 +3487,7 @@ async function exportBackupAsync() {
   try {
     if (window.pywebview && window.pywebview.api && window.pywebview.api.save_file) {
       const stamp = new Date().toISOString().slice(0,16).replace(/[-:T]/g, '');
-      const chosen = await window.pywebview.api.save_file(`sisat_base_datos_${stamp}.zip`);
+      const chosen = await window.pywebview.api.save_file(`satec_base_datos_${stamp}.zip`);
       if (!chosen) return;
       const r = await api('/api/backup/export-to', { method: 'POST', body: JSON.stringify({ path: chosen }) });
       toast('Base de datos exportada: ' + (r.path || chosen));
@@ -3609,7 +3609,7 @@ async function checkForUpdate() {
 }
 
 async function installUpdate() {
-  if (!confirm('¿Descargar e instalar la versión de GitHub? SISAT se cerrará y volverá a abrir. La base de datos no se borra.')) return;
+  if (!confirm('¿Descargar e instalar la versión de GitHub? SATEC se cerrará y volverá a abrir. La base de datos no se borra.')) return;
   toast('Descargando actualización...');
   try {
     const r = await api('/api/update/install', { method: 'POST' });
