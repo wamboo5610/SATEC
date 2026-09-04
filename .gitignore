@@ -35,3 +35,10 @@ data/apply_update.bat
 data/webview/
 installer/.update_auth
 data/update_auth
+
+# Uso interno WAMBOO TIC — no se publica (producto de pago)
+herramientas/
+installer/
+INSTALAR.bat
+pyproject.toml
+.python-version

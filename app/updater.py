@@ -21,15 +21,12 @@ from .version import APP_VERSION, GITHUB_BRANCH, GITHUB_OWNER, GITHUB_REPO, GITH
 SETTINGS_NAME = "update.json"
 STAGE_DIRNAME = "_update_stage"
 VERSION_RE = re.compile(r'APP_VERSION\s*=\s*["\']([\d.]+)["\']')
-ALLOWED_DIRS = ("app", "desktop", "assets", "installer", "herramientas")
+ALLOWED_DIRS = ("app", "desktop", "assets")
 ALLOWED_FILES = (
     "main.py",
     "run.py",
     "requirements.txt",
-    "pyproject.toml",
-    "README.md",
     "INICIAR.bat",
-    "INSTALAR.bat",
 )
 SKIP_NAMES = {
     "__pycache__",
@@ -42,6 +39,8 @@ SKIP_NAMES = {
     "web",
     "runtime",
     "EXT",
+    "herramientas",
+    "installer",
 }
 
 
@@ -485,15 +484,13 @@ def _write_apply_script(stage: Path, pid: int) -> Path:
         'if exist "%STAGE%\\app" xcopy /E /Y /I "%STAGE%\\app" "%ROOT%\\app\\" >nul',
         'if exist "%STAGE%\\desktop" xcopy /E /Y /I "%STAGE%\\desktop" "%ROOT%\\desktop\\" >nul',
         'if exist "%STAGE%\\assets" xcopy /E /Y /I "%STAGE%\\assets" "%ROOT%\\assets\\" >nul',
-        'if exist "%STAGE%\\installer" xcopy /E /Y /I "%STAGE%\\installer" "%ROOT%\\installer\\" >nul',
-        'if exist "%STAGE%\\herramientas" xcopy /E /Y /I "%STAGE%\\herramientas" "%ROOT%\\herramientas\\" >nul',
         'if exist "%STAGE%\\main.py" copy /Y "%STAGE%\\main.py" "%ROOT%\\main.py" >nul',
         'if exist "%STAGE%\\run.py" copy /Y "%STAGE%\\run.py" "%ROOT%\\run.py" >nul',
         'if exist "%STAGE%\\requirements.txt" copy /Y "%STAGE%\\requirements.txt" "%ROOT%\\requirements.txt" >nul',
-        'if exist "%STAGE%\\pyproject.toml" copy /Y "%STAGE%\\pyproject.toml" "%ROOT%\\pyproject.toml" >nul',
-        'if exist "%STAGE%\\README.md" copy /Y "%STAGE%\\README.md" "%ROOT%\\README.md" >nul',
         'if exist "%STAGE%\\INICIAR.bat" copy /Y "%STAGE%\\INICIAR.bat" "%ROOT%\\INICIAR.bat" >nul',
-        'if exist "%STAGE%\\INSTALAR.bat" copy /Y "%STAGE%\\INSTALAR.bat" "%ROOT%\\INSTALAR.bat" >nul',
+        'if exist "%ROOT%\\herramientas" rmdir /s /q "%ROOT%\\herramientas" >nul 2>&1',
+        'if exist "%ROOT%\\installer" rmdir /s /q "%ROOT%\\installer" >nul 2>&1',
+        'if exist "%ROOT%\\INSTALAR.bat" del /q "%ROOT%\\INSTALAR.bat" >nul 2>&1',
         f'if exist "{venv_py}" "{venv_py}" -m pip install -r "%ROOT%\\requirements.txt" -q',
         'if exist "%ROOT%\\runtime\\python.exe" "%ROOT%\\runtime\\python.exe" -m pip install -r "%ROOT%\\requirements.txt" -q',
         'rmdir /s /q "%STAGE%" >nul 2>&1',
