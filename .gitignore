@@ -33,3 +33,5 @@ data/_restore_tmp/
 data/update.json
 data/apply_update.bat
 data/webview/
+installer/.update_auth
+data/update_auth

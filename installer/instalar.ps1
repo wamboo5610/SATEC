@@ -45,6 +45,36 @@ function Find-SystemPython {
     return $null
 }
 
+function Configure-EmbedRuntime([string]$RuntimeDir) {
+    $dest = Split-Path $RuntimeDir -Parent
+    New-Item -ItemType Directory -Force -Path $RuntimeDir | Out-Null
+    $pth = Get-ChildItem $RuntimeDir -Filter "python*._pth" | Select-Object -First 1
+    if ($pth) {
+        $pthLines = @(
+            "python312.zip",
+            ".",
+            "..",
+            $dest,
+            "Lib",
+            "Lib\site-packages",
+            "import site"
+        )
+        $utf8 = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllLines($pth.FullName, $pthLines, $utf8)
+    }
+    $siteCustomize = @"
+import sys
+from pathlib import Path
+_root = str(Path(__file__).resolve().parent.parent)
+if _root not in sys.path:
+    sys.path.insert(0, _root)
+"@
+    Set-Content -Path (Join-Path $RuntimeDir "sitecustomize.py") -Value $siteCustomize -Encoding UTF8
+    $sp = Join-Path $RuntimeDir "Lib\site-packages"
+    New-Item -ItemType Directory -Force -Path $sp | Out-Null
+    Set-Content -Path (Join-Path $sp "satec.pth") -Value $dest -Encoding UTF8
+}
+
 function Install-EmbeddablePython([string]$RuntimeDir) {
     Write-Step "Descargando Python portatil (no hace falta instalarlo en Windows)..."
     New-Item -ItemType Directory -Force -Path $RuntimeDir | Out-Null
@@ -52,20 +82,15 @@ function Install-EmbeddablePython([string]$RuntimeDir) {
     Invoke-WebRequest -Uri $PyEmbedUrl -OutFile $zip -UseBasicParsing
     Expand-Archive -Path $zip -DestinationPath $RuntimeDir -Force
     Remove-Item $zip -Force -ErrorAction SilentlyContinue
-    $pth = Get-ChildItem $RuntimeDir -Filter "python*._pth" | Select-Object -First 1
-    if ($pth) {
-        @(
-            "python312.zip",
-            ".",
-            "Lib\site-packages",
-            "import site"
-        ) | Set-Content -Path $pth.FullName -Encoding ASCII
-    }
+    Configure-EmbedRuntime $RuntimeDir
     $getPip = Join-Path $RuntimeDir "get-pip.py"
     Invoke-WebRequest -Uri $GetPipUrl -OutFile $getPip -UseBasicParsing
     $py = Join-Path $RuntimeDir "python.exe"
     & $py $getPip --no-warn-script-location
     if ($LASTEXITCODE -ne 0) { throw "No se pudo instalar pip en Python portatil." }
+    & $py -m pip install --upgrade pip setuptools wheel
+    if ($LASTEXITCODE -ne 0) { throw "No se pudo instalar setuptools." }
+    Configure-EmbedRuntime $RuntimeDir
     return $py
 }
 
@@ -73,7 +98,10 @@ function Get-Python([string]$Dest) {
     $venvPy = Join-Path $Dest "venv\Scripts\python.exe"
     if (Test-Path $venvPy) { return $venvPy }
     $runtimePy = Join-Path $Dest "runtime\python.exe"
-    if (Test-Path $runtimePy) { return $runtimePy }
+    if (Test-Path $runtimePy) {
+        Configure-EmbedRuntime (Join-Path $Dest "runtime")
+        return $runtimePy
+    }
     $system = Find-SystemPython
     if ($system) {
         Write-Step "Creando entorno virtual con Python del sistema..."
@@ -103,7 +131,8 @@ function Copy-Payload([string]$Payload, [string]$Dest) {
 
 function Install-Deps([string]$Python, [string]$Dest) {
     Write-Step "Instalando componentes de SATEC..."
-    & $Python -m pip install --upgrade pip
+    & $Python -m pip install --upgrade pip setuptools wheel
+    if ($LASTEXITCODE -ne 0) { throw "No se pudo instalar setuptools. Revise la conexion a internet." }
     & $Python -m pip install -r (Join-Path $Dest "requirements.txt")
     if ($LASTEXITCODE -ne 0) { throw "Fallo la instalacion de dependencias. Revise la conexion a internet." }
 }
@@ -132,13 +161,20 @@ function Install-Shortcuts([string]$Dest) {
 
 function Test-Engine([string]$Python, [string]$Dest) {
     Write-Step "Comprobando motor y base de datos..."
-    Push-Location $Dest
-    try {
-        & $Python -c "from app import database, auth; from app.version import APP_NAME, APP_VERSION; database.init_db(); auth.init_auth(); print('OK', APP_NAME, APP_VERSION)"
-        if ($LASTEXITCODE -ne 0) { throw "El motor no arranco." }
-    } finally {
-        Pop-Location
+    $runtimeDir = Join-Path $Dest "runtime"
+    if (Test-Path (Join-Path $runtimeDir "python.exe")) {
+        Configure-EmbedRuntime $runtimeDir
     }
+    $code = @"
+import sys
+sys.path.insert(0, r'''$Dest''')
+from app import database, auth
+from app.version import APP_NAME, APP_VERSION
+database.init_db(); auth.init_auth()
+print('OK', APP_NAME, APP_VERSION)
+"@
+    & $Python -c $code
+    if ($LASTEXITCODE -ne 0) { throw "El motor no arranco." }
 }
 
 Write-Host "====================================================="

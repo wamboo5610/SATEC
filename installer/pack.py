@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import zipfile
@@ -116,9 +117,47 @@ def build() -> Path:
         for file in out_dir.rglob("*"):
             if file.is_file():
                 zf.write(file, file.relative_to(DIST))
-    return zip_path
+    return zip_path, out_dir
+
+
+def build_exe(out_dir: Path) -> Path:
+    import PyInstaller.__main__
+
+    exe_name = f"{APP_NAME}-{APP_VERSION}-Instalador-{AUTHOR.replace(' ', '-')}"
+    icon = ROOT / "assets" / "icon.ico"
+    payload = out_dir / "payload"
+    work = DIST / "_pyi_work"
+    spec = DIST / "_pyi_spec"
+    args = [
+        "--noconfirm",
+        "--clean",
+        "--onefile",
+        "--windowed",
+        f"--name={exe_name}",
+        f"--distpath={DIST}",
+        f"--workpath={work}",
+        f"--specpath={spec}",
+        "--add-data",
+        f"{payload}{os.pathsep}payload",
+    ]
+    if icon.exists():
+        args.append(f"--icon={icon}")
+    args.append(str(ROOT / "installer" / "exe_setup.py"))
+    PyInstaller.__main__.run(args)
+    exe = DIST / f"{exe_name}.exe"
+    if not exe.exists():
+        raise FileNotFoundError("No se generó el .exe del instalador")
+    short = DIST / f"{APP_NAME}-Instalador.exe"
+    shutil.copy2(exe, short)
+    return exe
 
 
 if __name__ == "__main__":
-    path = build()
-    print(path)
+    zip_path, folder = build()
+    print(zip_path)
+    try:
+        exe = build_exe(folder)
+        print(exe)
+    except Exception as exc:
+        print("ZIP listo. El EXE no se pudo generar:", exc)
+        raise

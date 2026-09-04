@@ -17,6 +17,7 @@ if errorlevel 1 (
     exit /b 1
 )
 echo.
-echo Listo. El ZIP esta en dist\
-echo Copielo a cada PC, descomprima y ejecute INSTALAR.bat
+echo Listo. En la carpeta dist\ quedo:
+echo  - el instalador EXE (doble clic en cada PC)
+echo  - el ZIP de respaldo
 pause
