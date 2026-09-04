@@ -25,6 +25,14 @@
     .sidebar-footer .author-kicker { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.7); font-weight:800; }
     .sidebar-footer .author-name { font-size:14px; font-weight:800; color:#fff; margin-top:4px; }
     .sidebar-footer .author-sub { font-size:10px; color:rgba(255,255,255,.72); margin-top:2px; font-weight:600; }
+    .update-banner {
+      display:none; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+      margin:0 0 16px; padding:12px 16px; border-radius:14px;
+      background:linear-gradient(135deg, rgba(8,136,48,.16), rgba(8,64,168,.14));
+      border:1px solid rgba(8,136,48,.35); color:var(--text); font-size:13px; font-weight:600;
+    }
+    .update-banner.show { display:flex; }
+    .update-banner .btn { padding:6px 12px; font-size:12px; }
     .user-menu { position:relative; }
     .user-menu-trigger {
       display:flex; align-items:center; gap:10px; padding:6px 10px 6px 6px;
@@ -319,7 +327,7 @@
     <div class="sidebar-footer">
       <div class="author-kicker">Autor</div>
       <div class="author-name">WAMBOO TIC</div>
-      <div class="author-sub">Escritorio para PC · v2.3</div>
+      <div class="author-sub">Escritorio para PC · v2.4</div>
     </div>
   </aside>
 
@@ -366,6 +374,13 @@
         </div>
       </div>
     </header>
+    <div class="update-banner" id="update-banner">
+      <span>Hay una nueva versión de SATEC disponible: <strong id="update-banner-ver">—</strong></span>
+      <div class="btn-row" style="margin:0">
+        <button class="btn btn-primary btn-sm" type="button" onclick="showPage('system')">Ver e instalar</button>
+        <button class="btn btn-outline btn-sm" type="button" onclick="dismissUpdateBanner()">Ahora no</button>
+      </div>
+    </div>
     <!-- DASHBOARD / MÓDULOS -->
     <section class="page active" id="page-dashboard">
       <div class="home-hero">
@@ -1252,30 +1267,17 @@
     <section class="page" id="page-system">
       <div class="page-header">
         <h2>Sistema</h2>
-        <p>Actualiza SATEC desde GitHub y exporta o restaura la base de datos. Autor: WAMBOO TIC</p>
+        <p>Actualiza SATEC y exporta o restaura la base de datos. Autor: WAMBOO TIC</p>
       </div>
       <div class="grid-2">
         <div class="card">
           <h3>Versión y actualización</h3>
           <p style="font-size:13px;margin-bottom:8px"><strong>Versión instalada:</strong> <span id="sys-current-version">—</span></p>
-          <p style="font-size:13px;margin-bottom:8px"><strong>GitHub:</strong> <span id="sys-github-url">—</span></p>
-          <p style="font-size:13px;color:var(--muted);margin-bottom:14px" id="sys-update-msg">Consulta GitHub para ver si hay una versión nueva. La base de datos no se toca al actualizar.</p>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:14px" id="sys-update-msg">Busca si hay una versión nueva. La base de datos no se toca al actualizar.</p>
           <div class="alert" id="sys-update-alert" style="display:none"></div>
           <div class="btn-row" id="sys-update-actions">
             <button class="btn btn-primary" type="button" onclick="checkForUpdate()">🔄 Buscar actualización</button>
             <button class="btn btn-success" type="button" id="sys-install-btn" style="display:none" onclick="installUpdate()">⬇️ Instalar versión nueva</button>
-          </div>
-          <div id="sys-admin-update" style="display:none;margin-top:18px">
-            <h3>Repositorio privado</h3>
-            <p style="font-size:12px;color:var(--muted);margin-bottom:10px">
-              Si el repo es privado, crea un token en GitHub (permiso <code>repo</code>) y pégalo aquí.
-              No se sube a internet: queda solo en este PC.
-            </p>
-            <div class="form-group"><label>Repositorio</label><input id="sys-repo" placeholder="wamboo5610/SATEC"></div>
-            <div class="form-group"><label>Rama</label><input id="sys-branch" placeholder="main"></div>
-            <div class="form-group"><label>Token GitHub (opcional)</label><input id="sys-token" type="password" placeholder="ghp_…" autocomplete="off"></div>
-            <button class="btn btn-outline btn-sm" type="button" onclick="saveUpdateSettings()">💾 Guardar conexión GitHub</button>
-            <p style="font-size:11px;color:var(--muted);margin-top:8px" id="sys-token-state"></p>
           </div>
         </div>
         <div class="card">
@@ -1371,7 +1373,7 @@
       Aplicación de escritorio para PC. Control de relojes biométricos ZKTeco,
       asistencia multi-sede, tardanzas y reportes.
     </p>
-    <p style="font-size:13px;margin-bottom:4px"><strong>Versión</strong> <span id="about-version">2.3.0</span></p>
+    <p style="font-size:13px;margin-bottom:4px"><strong>Versión</strong> <span id="about-version">2.4.0</span></p>
     <p style="font-size:13px;margin-bottom:4px"><strong>Autor</strong> WAMBOO TIC</p>
     <p style="font-size:12px;color:var(--muted);margin-top:12px">Las marcaciones quedan guardadas en este equipo. Cerrar la ventana no borra la base de datos.</p>
     <div class="modal-actions">
@@ -3538,22 +3540,11 @@ async function loadSystemPage() {
   try {
     const info = await api('/api/system/status');
     document.getElementById('sys-current-version').textContent = info.version || '—';
-    document.getElementById('sys-github-url').textContent = (info.update && info.update.github_url) || '—';
     document.getElementById('sys-db-path').textContent = info.db_path || '—';
     document.getElementById('sys-db-size').textContent = info.size_label || '—';
     document.getElementById('sys-db-mtime').textContent = info.modified_at || '—';
     document.getElementById('sys-db-records').textContent = (info.stats && info.stats.total) ?? '—';
     document.getElementById('sys-db-users').textContent = (info.stats && (info.stats.registered_employees ?? info.stats.unique_users)) ?? '—';
-    const adminBox = document.getElementById('sys-admin-update');
-    if (adminBox) adminBox.style.display = info.is_admin ? 'block' : 'none';
-    if (info.update) {
-      const repo = document.getElementById('sys-repo');
-      const branch = document.getElementById('sys-branch');
-      if (repo && !repo.value) repo.value = info.update.repo || '';
-      if (branch && !branch.value) branch.value = info.update.branch || 'main';
-      const tokenState = document.getElementById('sys-token-state');
-      if (tokenState) tokenState.textContent = info.update.has_token ? 'Token guardado en este PC.' : 'Sin token (sirve si el repo es público).';
-    }
     const restoreLabel = document.getElementById('sys-restore-label');
     if (restoreLabel && !info.is_admin) restoreLabel.style.display = 'none';
     if (info.is_admin && window.pywebview && window.pywebview.api && window.pywebview.api.open_file && restoreLabel) {
@@ -3568,22 +3559,6 @@ async function loadSystemPage() {
   }
 }
 
-async function saveUpdateSettings() {
-  try {
-    const payload = {
-      repo: document.getElementById('sys-repo').value.trim(),
-      branch: document.getElementById('sys-branch').value.trim(),
-    };
-    const token = document.getElementById('sys-token').value.trim();
-    if (token) payload.github_token = token;
-    const r = await api('/api/update/settings', { method: 'POST', body: JSON.stringify(payload) });
-    document.getElementById('sys-token').value = '';
-    toast('Conexión GitHub guardada');
-    document.getElementById('sys-token-state').textContent = r.has_token ? 'Token guardado en este PC.' : 'Sin token.';
-    document.getElementById('sys-github-url').textContent = r.github_url || '';
-  } catch (e) { toast(e.message, 'error'); }
-}
-
 async function checkForUpdate() {
   const alertEl = document.getElementById('sys-update-alert');
   const installBtn = document.getElementById('sys-install-btn');
@@ -3591,30 +3566,55 @@ async function checkForUpdate() {
   if (installBtn) installBtn.style.display = 'none';
   try {
     const r = await api('/api/update/check', { method: 'POST' });
-    if (msg) msg.textContent = r.message || '';
+    const text = r.update_available
+      ? `Hay una versión nueva: ${r.remote_version} (instalada: ${r.current_version || ''}).`
+      : 'SATEC está actualizado. No hay una versión nueva.';
+    if (msg) msg.textContent = text;
     if (alertEl) {
       alertEl.style.display = 'block';
       alertEl.className = 'alert ' + (r.update_available ? 'alert-success' : 'alert-info');
-      alertEl.textContent = r.message + (r.remote_version ? `  ·  GitHub: ${r.remote_version}` : '');
+      alertEl.textContent = text;
     }
     if (r.update_available && installBtn) installBtn.style.display = '';
   } catch (e) {
+    const text = 'No hay una versión nueva disponible por ahora.';
+    if (msg) msg.textContent = text;
     if (alertEl) {
       alertEl.style.display = 'block';
-      alertEl.className = 'alert alert-error';
-      alertEl.textContent = e.message;
+      alertEl.className = 'alert alert-info';
+      alertEl.textContent = text;
     }
-    toast(e.message, 'error');
   }
 }
 
 async function installUpdate() {
-  if (!confirm('¿Descargar e instalar la versión de GitHub? SATEC se cerrará y volverá a abrir. La base de datos no se borra.')) return;
+  if (!confirm('¿Descargar e instalar la versión nueva? SATEC se cerrará y volverá a abrir. La base de datos no se borra.')) return;
   toast('Descargando actualización...');
   try {
     const r = await api('/api/update/install', { method: 'POST' });
     toast(r.message || 'Reiniciando para aplicar la actualización...');
   } catch (e) { toast(e.message, 'error'); }
+}
+
+async function checkUpdateNotice() {
+  try {
+    const r = await api('/api/update/notice');
+    const banner = document.getElementById('update-banner');
+    if (!banner) return;
+    if (r && r.update_available && r.remote_version) {
+      const ver = document.getElementById('update-banner-ver');
+      if (ver) ver.textContent = r.remote_version;
+      banner.classList.add('show');
+    } else {
+      banner.classList.remove('show');
+    }
+  } catch (e) { /* sin internet o repo privado: no molestar */ }
+}
+
+async function dismissUpdateBanner() {
+  const banner = document.getElementById('update-banner');
+  if (banner) banner.classList.remove('show');
+  try { await api('/api/update/dismiss', { method: 'POST' }); } catch (e) { /* ignore */ }
 }
 
 function exportAllUsers() {
@@ -4428,6 +4428,7 @@ checkAuth().then(() => {
   loadDashboard();
   loadServerInfo();
   loadSedeFilters();
+  checkUpdateNotice();
 });
 setInterval(updateClock, 30000);
 setInterval(() => {

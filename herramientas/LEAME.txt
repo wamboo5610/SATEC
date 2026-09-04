@@ -1,0 +1,9 @@
+Herramientas de SATEC (no hacen falta en el dia a dia)
+
+- CREAR_INSTALADOR.bat  Genera el ZIP para instalar en otras PCs (carpeta dist)
+- PUBLICAR_GITHUB.bat   Sube una version nueva a GitHub. Las PCs lo veran como actualizacion
+- INICIAR_CONSOLA.bat   Abre SATEC con ventana negra (para ver errores)
+- INICIAR_SERVIDOR.bat  Servidor en red local / relojes ADMS
+- DESINSTALAR.bat       Quita accesos directos. No borra la base de datos
+
+Para usar SATEC: vuelva a la carpeta principal y use INICIAR.bat

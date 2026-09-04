@@ -2,45 +2,32 @@
 
 Aplicación de **escritorio para PC**. Autor: **WAMBOO TIC**.
 
-No confundir con **SISAT**, que es el sistema web. SATEC es el programa de escritorio.
+No confundir con **SISAT** (sistema web). SATEC es el programa de escritorio.
 
-Control de relojes biométricos ZKTeco, asistencia multi-sede, tardanzas, Excel y reportes. Los datos quedan en este equipo (`data/attendance.db`).
-
-## Instalar en una PC
-
-1. Python 3.12 o superior (marque *Add python.exe to PATH*).
-2. Ejecute `CREAR_INSTALADOR.bat` en el equipo de desarrollo. Sale un ZIP en `dist\`.
-3. En la PC destino: descomprima el ZIP y ejecute `SETUP.bat`.
-4. O, en esta misma carpeta, ejecute `INSTALAR.bat`.
-
-Acceso inicial: usuario `admin` / contraseña `admin123`. Cámbiela al entrar.
-
-## Cómo se abre
+## En esta carpeta (uso diario)
 
 | Archivo | Uso |
 |---|---|
-| `INICIAR.bat` | Ventana de escritorio |
-| `INICIAR_CONSOLA.bat` | Igual, con consola para ver errores |
-| `INICIAR_SERVIDOR.bat` | Servidor web en `http://127.0.0.1:8000` (red local / ADMS) |
-| `CREAR_INSTALADOR.bat` | Genera el ZIP instalador en `dist\` |
-| `PUBLICAR_GITHUB.bat` | Sube el código a GitHub para actualizar otras PCs |
-| `DESINSTALAR.bat` | Quita accesos directos |
+| `INICIAR.bat` | Abre SATEC |
+| `INSTALAR.bat` | Primera vez o reinstalación (no borra la base de datos) |
+| `data\` | Bases de datos (`attendance.db` y cuentas) |
 
-## Actualizar desde GitHub
+## Instalar en otras PCs
 
-1. Suba el código con `PUBLICAR_GITHUB.bat` al repo `https://github.com/wamboo5610/SATEC`.
-2. En cada PC: menú **Sistema** → **Buscar actualización** → **Instalar versión nueva**.
-3. Si el repositorio es privado, pegue un token de GitHub (permiso `repo`) en esa misma pantalla.
+1. En esta PC: `herramientas\CREAR_INSTALADOR.bat`
+2. Copie el ZIP de `dist\` a cada máquina
+3. Descomprima y dé **doble clic en INSTALAR.bat**
+4. Si no hay Python, el instalador descarga una copia portátil
+5. Acceso: `admin` / `admin123` (cámbielo)
 
-La base de datos no se toca al actualizar.
+Reinstalar **no borra** marcaciones ni empleados.
 
-## Exportar o restaurar la base
+## Actualizar (dentro de un mes o cuando publique)
 
-En **Sistema** (o en Relojes):
+1. En esta PC: `herramientas\PUBLICAR_GITHUB.bat` (repo `wamboo5610/SATEC`)
+2. En las otras PCs, al abrir SATEC aparece el aviso **Hay una nueva versión disponible**
+3. **Sistema → Instalar versión nueva**. La base de datos no se toca.
 
-- **Exportar base de datos** — ZIP con `attendance.db` y cuentas.
-- **Restaurar base de datos** — reemplaza los datos actuales (solo administrador).
+## Herramientas
 
-## Autor
-
-**WAMBOO TIC**
+Carpeta `herramientas\`: publicador GitHub, creador del instalador, consola y servidor LAN.

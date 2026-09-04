@@ -25,9 +25,10 @@ SKIP_DIRS = {
     "DESCARGAS_LOCALES",
     "REPORTES",
     "data",
+    "web",
+    "runtime",
 }
-SKIP_FILES = {".pyc", ".pyo"}
-COPY_DIRS = ("app", "desktop", "assets", "installer")
+COPY_DIRS = ("app", "desktop", "assets", "installer", "herramientas")
 COPY_FILES = (
     "main.py",
     "run.py",
@@ -35,12 +36,7 @@ COPY_FILES = (
     "pyproject.toml",
     "README.md",
     "INICIAR.bat",
-    "INICIAR_CONSOLA.bat",
-    "INICIAR_SERVIDOR.bat",
     "INSTALAR.bat",
-    "DESINSTALAR.bat",
-    "CREAR_INSTALADOR.bat",
-    "PUBLICAR_GITHUB.bat",
 )
 
 
@@ -59,7 +55,7 @@ def _copy_tree(src: Path, dest: Path) -> None:
 def build() -> Path:
     name = f"{APP_NAME}-{APP_VERSION}-Instalador-{AUTHOR.replace(' ', '-')}"
     out_dir = DIST / name
-    if DIST.exists():
+    if out_dir.exists():
         shutil.rmtree(out_dir, ignore_errors=True)
     payload = out_dir / "payload"
     payload.mkdir(parents=True)
@@ -75,24 +71,26 @@ def build() -> Path:
     (payload / "data").mkdir(exist_ok=True)
     (payload / "data" / ".gitkeep").write_text("", encoding="utf-8")
 
-    shutil.copy2(ROOT / "installer" / "setup.py", out_dir / "setup.py")
-    (out_dir / "SETUP.bat").write_text(
+    (out_dir / "INSTALAR.bat").write_text(
         "\r\n".join(
             [
                 "@echo off",
                 "chcp 65001 >nul",
                 "cd /d \"%~dp0\"",
                 "title Instalar SATEC — WAMBOO TIC",
-                "where python >nul 2>nul",
+                "echo.",
+                "echo  SATEC  Sistema de Asistencia Tecnico",
+                "echo  Instalador para PC  |  WAMBOO TIC",
+                "echo  Si ya habia SATEC, se conserva la base de datos.",
+                "echo.",
+                "powershell -NoProfile -ExecutionPolicy Bypass -File \"%~dp0payload\\installer\\instalar.ps1\" -Mode Setup",
                 "if errorlevel 1 (",
-                "  echo No se encontro Python 3.12 o superior.",
-                "  echo Descarguelo en https://www.python.org/downloads/",
-                "  echo Marque Add python.exe to PATH.",
+                "  echo.",
+                "  echo La instalacion no termino. Revise internet y vuelva a intentar.",
                 "  pause",
                 "  exit /b 1",
                 ")",
-                "python setup.py",
-                "if errorlevel 1 pause",
+                "pause",
             ]
         )
         + "\r\n",
@@ -100,10 +98,14 @@ def build() -> Path:
     )
     (out_dir / "LEAME.txt").write_text(
         f"SATEC {APP_VERSION} — {AUTHOR}\n\n"
-        "1. Instale Python 3.12 o superior (con PATH).\n"
-        "2. Ejecute SETUP.bat\n"
-        "3. Acceso inicial: admin / admin123\n"
-        "4. Cambie la contraseña al entrar.\n",
+        "INSTALAR EN CUALQUIER PC\n"
+        "1. Descomprima este ZIP.\n"
+        "2. Doble clic en INSTALAR.bat\n"
+        "3. Si la PC no tiene Python, el instalador descarga una copia portatil.\n"
+        "4. Se crea el acceso directo 'SATEC WAMBOO TIC' en el escritorio.\n"
+        "5. Acceso inicial: admin / admin123  (cambielo al entrar).\n\n"
+        "Reinstalar o actualizar NO borra la base de datos.\n"
+        "Las nuevas versiones se avisan dentro de SATEC (Sistema).\n",
         encoding="utf-8",
     )
 

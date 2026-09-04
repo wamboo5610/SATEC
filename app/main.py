@@ -1674,6 +1674,16 @@ def update_status():
     return upd.public_settings()
 
 
+@app.get("/api/update/notice")
+def update_notice():
+    return upd.notice_for_ui()
+
+
+@app.post("/api/update/dismiss")
+def update_dismiss():
+    return upd.dismiss_notice()
+
+
 @app.post("/api/update/settings")
 def update_settings(data: UpdateSettingsRequest, request: Request):
     if not auth.is_admin(request):
@@ -1690,7 +1700,9 @@ def update_check(request: Request):
     if not auth.is_admin(request):
         raise HTTPException(403, "Solo administradores")
     try:
-        return upd.check_for_update()
+        info = upd.check_for_update()
+        upd._store_notice(info)
+        return info
     except RuntimeError as e:
         raise HTTPException(400, str(e))
     except Exception as e:

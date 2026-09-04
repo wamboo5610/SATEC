@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-cd /d "%~dp0"
+cd /d "%~dp0\.."
 title Publicar SATEC en GitHub — WAMBOO TIC
 
 set GIT=
@@ -23,7 +23,8 @@ echo  Destino: %REPO%
 echo =====================================================
 echo.
 echo SISAT es el sistema WEB. Este escritorio se publica en SATEC.
-echo La base de datos local NO se sube.
+echo IMPORTANTE: la base de datos (data\attendance.db) NO se sube.
+echo Tampoco se suben cuentas, descargas locales ni reportes Excel.
 echo.
 
 if not exist ".git" (
@@ -41,6 +42,18 @@ set /p MSG="Mensaje del commit (Enter = Actualizacion SATEC): "
 if "%MSG%"=="" set MSG=Actualizacion SATEC
 
 "%GIT%" add -A
+"%GIT%" reset -q -- "data/attendance.db" "data/auth.json" "data/" "data/.gitkeep" 2>nul
+"%GIT%" add -f -- "data/.gitkeep" 2>nul
+"%GIT%" diff --cached --name-only | findstr /I /C:"attendance.db" /C:"auth.json" /C:".db" /C:".sqlite" >nul
+if not errorlevel 1 (
+    echo.
+    echo ERROR: se iba a subir la base de datos. Se cancelo el envio.
+    echo La carpeta data\ no se publica en GitHub.
+    "%GIT%" reset -q
+    pause
+    exit /b 1
+)
+
 "%GIT%" commit -m "%MSG%"
 if errorlevel 1 (
     echo No hay archivos nuevos. Se subira el ultimo commit.
@@ -70,9 +83,6 @@ if errorlevel 1 (
 
 :ok
 echo.
-echo Listo. Codigo de SATEC en:
-echo https://github.com/wamboo5610/SATEC
-echo.
-echo En la app: Sistema - Buscar actualizacion.
-echo Si el repo es privado, pegue un token (permiso repo) ahi.
+echo Listo. Se subio el codigo de SATEC.
+echo La base de datos se quedo en esta PC.
 pause

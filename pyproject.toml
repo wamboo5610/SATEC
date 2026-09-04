@@ -1,6 +1,6 @@
 [project]
 name = "satec"
-version = "2.3.0"
+version = "2.4.0"
 description = "SATEC — Sistema de Asistencia Técnico, aplicación de escritorio para PC. Autor: WAMBOO TIC."
 requires-python = ">=3.12"
 dependencies = [

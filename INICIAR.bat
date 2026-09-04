@@ -1,9 +1,14 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-if not exist "venv\Scripts\pythonw.exe" (
-    echo Primero ejecute INSTALAR.bat
-    pause
-    exit /b 1
+if exist "venv\Scripts\pythonw.exe" (
+    start "" "venv\Scripts\pythonw.exe" "%~dp0main.py"
+    exit /b 0
 )
-start "" "venv\Scripts\pythonw.exe" "%~dp0main.py"
+if exist "runtime\pythonw.exe" (
+    start "" "runtime\pythonw.exe" "%~dp0main.py"
+    exit /b 0
+)
+echo Primero ejecute INSTALAR.bat
+pause
+exit /b 1

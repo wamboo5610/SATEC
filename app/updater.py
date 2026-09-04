@@ -21,7 +21,7 @@ from .version import APP_VERSION, GITHUB_BRANCH, GITHUB_OWNER, GITHUB_REPO, GITH
 SETTINGS_NAME = "update.json"
 STAGE_DIRNAME = "_update_stage"
 VERSION_RE = re.compile(r'APP_VERSION\s*=\s*["\']([\d.]+)["\']')
-ALLOWED_DIRS = ("app", "desktop", "assets", "installer")
+ALLOWED_DIRS = ("app", "desktop", "assets", "installer", "herramientas")
 ALLOWED_FILES = (
     "main.py",
     "run.py",
@@ -29,12 +29,7 @@ ALLOWED_FILES = (
     "pyproject.toml",
     "README.md",
     "INICIAR.bat",
-    "INICIAR_CONSOLA.bat",
-    "INICIAR_SERVIDOR.bat",
     "INSTALAR.bat",
-    "CREAR_INSTALADOR.bat",
-    "PUBLICAR_GITHUB.bat",
-    "DESINSTALAR.bat",
 )
 SKIP_NAMES = {
     "__pycache__",
@@ -44,11 +39,23 @@ SKIP_NAMES = {
     "recursos",
     ".git",
     "webview",
+    "web",
+    "runtime",
+    "EXT",
 }
 
 
 def settings_path() -> Path:
     return get_data_dir() / SETTINGS_NAME
+
+
+CACHE_KEYS = (
+    "last_check_at",
+    "last_remote_version",
+    "last_update_available",
+    "last_message",
+    "dismissed_version",
+)
 
 
 def load_settings() -> dict:
@@ -68,6 +75,9 @@ def load_settings() -> dict:
                     data["branch"] = str(stored["branch"]).strip()
                 if stored.get("github_token"):
                     data["github_token"] = str(stored["github_token"]).strip()
+                for key in CACHE_KEYS:
+                    if key in stored:
+                        data[key] = stored[key]
         except (json.JSONDecodeError, OSError):
             pass
     return data
@@ -90,11 +100,8 @@ def public_settings(data: dict | None = None) -> dict:
     data = data or load_settings()
     token = data.get("github_token") or ""
     return {
-        "repo": data.get("repo") or f"{GITHUB_OWNER}/{GITHUB_REPO}",
-        "branch": data.get("branch") or GITHUB_BRANCH,
-        "github_url": f"https://github.com/{data.get('repo') or f'{GITHUB_OWNER}/{GITHUB_REPO}'}",
-        "has_token": bool(token),
         "current_version": APP_VERSION,
+        "has_token": bool(token),
     }
 
 
@@ -132,13 +139,10 @@ def _http_json(url: str, token: str) -> dict:
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         if exc.code in (401, 403, 404):
-            hint = "El repositorio no existe, es privado o el token no tiene permiso."
-            if not token:
-                hint += " Si es privado, pega un token de GitHub en Sistema."
-            raise RuntimeError(hint) from exc
-        raise RuntimeError(f"GitHub respondió {exc.code}: {body[:180]}") from exc
+            raise RuntimeError("No hay una versión nueva disponible por ahora.") from exc
+        raise RuntimeError("No se pudo consultar actualizaciones.") from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(f"No hay conexión con GitHub: {exc.reason}") from exc
+        raise RuntimeError("No se pudo consultar actualizaciones.") from exc
 
 
 def _http_bytes(url: str, token: str) -> bytes:
@@ -148,10 +152,8 @@ def _http_bytes(url: str, token: str) -> bytes:
             return response.read()
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403, 404):
-            raise RuntimeError(
-                "No se pudo descargar el ZIP. Revisa que el repo exista y, si es privado, el token."
-            ) from exc
-        raise RuntimeError(f"Error al descargar ({exc.code})") from exc
+            raise RuntimeError("No se pudo descargar la actualización.") from exc
+        raise RuntimeError("No se pudo descargar la actualización.") from exc
 
 
 def _version_from_text(text: str) -> str | None:
@@ -227,6 +229,57 @@ def check_for_update() -> dict:
     else:
         result["message"] = f"Tu versión local ({APP_VERSION}) es más reciente que GitHub ({remote_version})."
     return result
+
+
+def _store_notice(info: dict) -> None:
+    data = load_settings()
+    data["last_check_at"] = time.time()
+    data["last_remote_version"] = info.get("remote_version")
+    data["last_update_available"] = bool(info.get("update_available"))
+    data["last_message"] = info.get("message") or ""
+    settings_path().parent.mkdir(parents=True, exist_ok=True)
+    settings_path().write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def notice_for_ui(*, force: bool = False, max_age_hours: float = 6) -> dict:
+    """Consulta GitHub (con caché) para avisar si hay versión nueva. Nunca lanza error a la UI."""
+    settings = load_settings()
+    last = float(settings.get("last_check_at") or 0)
+    age = time.time() - last
+    if not force and last and age < max_age_hours * 3600 and settings.get("last_remote_version"):
+        available = bool(settings.get("last_update_available"))
+        remote = settings.get("last_remote_version")
+        dismissed = settings.get("dismissed_version")
+        return {
+            **public_settings(settings),
+            "update_available": available and dismissed != remote,
+            "remote_version": remote,
+            "message": settings.get("last_message") or "",
+            "cached": True,
+        }
+    try:
+        info = check_for_update()
+        _store_notice(info)
+        dismissed = load_settings().get("dismissed_version")
+        if info.get("update_available") and dismissed == info.get("remote_version"):
+            info = {**info, "update_available": False, "dismissed": True}
+        return {**info, "cached": False}
+    except Exception as exc:
+        return {
+            **public_settings(settings),
+            "update_available": False,
+            "remote_version": settings.get("last_remote_version"),
+            "message": str(exc),
+            "offline": True,
+            "cached": True,
+        }
+
+
+def dismiss_notice(version: str | None = None) -> dict:
+    data = load_settings()
+    data["dismissed_version"] = (version or data.get("last_remote_version") or "").strip()
+    settings_path().write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return public_settings(data)
 
 
 def _copy_allowed(src_root: Path, dest: Path) -> list[str]:
@@ -323,19 +376,16 @@ def _write_apply_script(stage: Path, pid: int) -> Path:
         'if exist "%STAGE%\\desktop" xcopy /E /Y /I "%STAGE%\\desktop" "%ROOT%\\desktop\\" >nul',
         'if exist "%STAGE%\\assets" xcopy /E /Y /I "%STAGE%\\assets" "%ROOT%\\assets\\" >nul',
         'if exist "%STAGE%\\installer" xcopy /E /Y /I "%STAGE%\\installer" "%ROOT%\\installer\\" >nul',
+        'if exist "%STAGE%\\herramientas" xcopy /E /Y /I "%STAGE%\\herramientas" "%ROOT%\\herramientas\\" >nul',
         'if exist "%STAGE%\\main.py" copy /Y "%STAGE%\\main.py" "%ROOT%\\main.py" >nul',
         'if exist "%STAGE%\\run.py" copy /Y "%STAGE%\\run.py" "%ROOT%\\run.py" >nul',
         'if exist "%STAGE%\\requirements.txt" copy /Y "%STAGE%\\requirements.txt" "%ROOT%\\requirements.txt" >nul',
         'if exist "%STAGE%\\pyproject.toml" copy /Y "%STAGE%\\pyproject.toml" "%ROOT%\\pyproject.toml" >nul',
         'if exist "%STAGE%\\README.md" copy /Y "%STAGE%\\README.md" "%ROOT%\\README.md" >nul',
         'if exist "%STAGE%\\INICIAR.bat" copy /Y "%STAGE%\\INICIAR.bat" "%ROOT%\\INICIAR.bat" >nul',
-        'if exist "%STAGE%\\INICIAR_CONSOLA.bat" copy /Y "%STAGE%\\INICIAR_CONSOLA.bat" "%ROOT%\\INICIAR_CONSOLA.bat" >nul',
-        'if exist "%STAGE%\\INICIAR_SERVIDOR.bat" copy /Y "%STAGE%\\INICIAR_SERVIDOR.bat" "%ROOT%\\INICIAR_SERVIDOR.bat" >nul',
         'if exist "%STAGE%\\INSTALAR.bat" copy /Y "%STAGE%\\INSTALAR.bat" "%ROOT%\\INSTALAR.bat" >nul',
-        'if exist "%STAGE%\\CREAR_INSTALADOR.bat" copy /Y "%STAGE%\\CREAR_INSTALADOR.bat" "%ROOT%\\CREAR_INSTALADOR.bat" >nul',
-        'if exist "%STAGE%\\PUBLICAR_GITHUB.bat" copy /Y "%STAGE%\\PUBLICAR_GITHUB.bat" "%ROOT%\\PUBLICAR_GITHUB.bat" >nul',
-        'if exist "%STAGE%\\DESINSTALAR.bat" copy /Y "%STAGE%\\DESINSTALAR.bat" "%ROOT%\\DESINSTALAR.bat" >nul',
         f'if exist "{venv_py}" "{venv_py}" -m pip install -r "%ROOT%\\requirements.txt" -q',
+        'if exist "%ROOT%\\runtime\\python.exe" "%ROOT%\\runtime\\python.exe" -m pip install -r "%ROOT%\\requirements.txt" -q',
         'rmdir /s /q "%STAGE%" >nul 2>&1',
         'start "" "%ROOT%\\INICIAR.bat"',
         "exit",

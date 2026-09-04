@@ -1,21 +1,35 @@
+# Entornos
 venv/
+runtime/
 __pycache__/
 *.pyc
 *.pyo
+
+# Bases de datos y datos locales — NUNCA subir a GitHub
+/data/*
+!/data/.gitkeep
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+auth.json
+
+# Descargas y reportes del cliente
+DESCARGAS_LOCALES/
+REPORTES/*.xlsx
+REPORTES/*.xls
+
+# Caché, logs, respaldos temporales
+*.log
+dist/
 recursos/
-data/pythonw_test.txt
-data/attendance.db
-data/attendance.db-*
-data/auth.json
-data/webview/
-data/*.log
-data/satec.log
-data/sisat.log
+web/
+.EXT/
+
+# Actualizador local
 data/_update_stage/
 data/_restore_tmp/
 data/update.json
 data/apply_update.bat
-dist/
-DESCARGAS_LOCALES/
-REPORTES/*.xlsx
-.EXT/
+data/webview/
