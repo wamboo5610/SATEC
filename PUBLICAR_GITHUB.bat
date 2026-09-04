@@ -15,18 +15,27 @@ if "%GIT%"=="" (
     exit /b 1
 )
 
-echo Repositorio: https://github.com/wamboo5610/SATEC
+set REPO=https://github.com/wamboo5610/SATEC.git
 echo.
-echo 1. Cree el repo SATEC en GitHub si aun no existe (publico o privado).
-echo 2. Este script sube el codigo. La base de datos local NO se sube.
+echo =====================================================
+echo  Publicar SATEC  (NO se usa el repo SISAT)
+echo  Destino: %REPO%
+echo =====================================================
+echo.
+echo SISAT es el sistema WEB. Este escritorio se publica en SATEC.
+echo La base de datos local NO se sube.
 echo.
 
 if not exist ".git" (
     "%GIT%" init
-    "%GIT%" remote remove origin >nul 2>nul
-    "%GIT%" remote add origin https://github.com/wamboo5610/SATEC.git
     "%GIT%" branch -M main
 )
+
+"%GIT%" remote remove origin >nul 2>nul
+"%GIT%" remote add origin "%REPO%"
+"%GIT%" branch -M main
+echo Remoto origin = %REPO%
+echo.
 
 set /p MSG="Mensaje del commit (Enter = Actualizacion SATEC): "
 if "%MSG%"=="" set MSG=Actualizacion SATEC
@@ -34,15 +43,36 @@ if "%MSG%"=="" set MSG=Actualizacion SATEC
 "%GIT%" add -A
 "%GIT%" commit -m "%MSG%"
 if errorlevel 1 (
-    echo No hay cambios nuevos o el commit fallo.
+    echo No hay archivos nuevos. Se subira el ultimo commit.
 )
+
+echo.
+echo Subiendo a GitHub SATEC...
+"%GIT%" push -u origin main
+if not errorlevel 1 goto :ok
+
+echo.
+echo No se pudo subir. Suele faltar el repositorio SATEC en GitHub.
+echo Se abrira el navegador. Cree un repo VACIO llamado SATEC
+echo (sin README, sin .gitignore y sin licencia) y vuelva aqui.
+echo.
+start "" "https://github.com/new?name=SATEC"
+echo Cuando el repo SATEC exista, presione una tecla para reintentar.
+pause >nul
 "%GIT%" push -u origin main
 if errorlevel 1 (
-    echo Error al subir. Inicie sesion en GitHub o cree el repositorio SATEC.
+    echo.
+    echo Sigue fallando. Cree el repo https://github.com/wamboo5610/SATEC
+    echo vacio y ejecute otra vez PUBLICAR_GITHUB.bat
     pause
     exit /b 1
 )
+
+:ok
 echo.
-echo Listo. En SATEC: Sistema - Buscar actualizacion.
-echo Si el repo es privado, pega un token (permiso repo) en esa pantalla.
+echo Listo. Codigo de SATEC en:
+echo https://github.com/wamboo5610/SATEC
+echo.
+echo En la app: Sistema - Buscar actualizacion.
+echo Si el repo es privado, pegue un token (permiso repo) ahi.
 pause
