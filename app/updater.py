@@ -120,9 +120,9 @@ def is_newer(remote: str, local: str) -> bool:
     return r > l
 
 
-def _headers(token: str) -> dict[str, str]:
+def _headers(token: str, accept: str = "application/vnd.github+json") -> dict[str, str]:
     headers = {
-        "Accept": "application/vnd.github+json",
+        "Accept": accept,
         "User-Agent": "SATEC-WAMBOOTIC-Updater",
         "X-GitHub-Api-Version": "2022-11-28",
     }
@@ -131,15 +131,66 @@ def _headers(token: str) -> dict[str, str]:
     return headers
 
 
+def _git_exe() -> str | None:
+    found = shutil.which("git")
+    if found:
+        return found
+    for candidate in (
+        r"C:\Program Files\Git\cmd\git.exe",
+        r"C:\Program Files (x86)\Git\cmd\git.exe",
+    ):
+        if Path(candidate).exists():
+            return candidate
+    return None
+
+
+def _win_flags() -> int:
+    return getattr(subprocess, "CREATE_NO_WINDOW", 0) if sys.platform == "win32" else 0
+
+
+def _token_from_git() -> str:
+    """Solo en el PC de desarrollo (carpeta con .git). No pide credenciales en PCs instaladas."""
+    if not (ROOT / ".git").exists():
+        return ""
+    git = _git_exe()
+    if not git:
+        return ""
+    try:
+        proc = subprocess.run(
+            [git, "credential", "fill"],
+            input="protocol=https\nhost=github.com\n\n",
+            capture_output=True,
+            text=True,
+            timeout=8,
+            creationflags=_win_flags(),
+        )
+        if proc.returncode != 0:
+            return ""
+        for line in proc.stdout.splitlines():
+            if line.lower().startswith("password="):
+                return line.split("=", 1)[1].strip()
+    except Exception:
+        return ""
+    return ""
+
+
+def resolve_token(explicit: str | None = None) -> str:
+    if explicit and explicit.strip():
+        return explicit.strip()
+    env = (os.environ.get("SATEC_GITHUB_TOKEN") or os.environ.get("SISAT_GITHUB_TOKEN") or "").strip()
+    if env:
+        return env
+    return _token_from_git()
+
+
 def _http_json(url: str, token: str) -> dict:
     req = urllib.request.Request(url, headers=_headers(token))
     try:
         with urllib.request.urlopen(req, timeout=25) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
         if exc.code in (401, 403, 404):
-            raise RuntimeError("No hay una versión nueva disponible por ahora.") from exc
+            raise RuntimeError("github-auth") from exc
         raise RuntimeError("No se pudo consultar actualizaciones.") from exc
     except urllib.error.URLError as exc:
         raise RuntimeError("No se pudo consultar actualizaciones.") from exc
@@ -156,16 +207,54 @@ def _http_bytes(url: str, token: str) -> bytes:
         raise RuntimeError("No se pudo descargar la actualización.") from exc
 
 
+def _http_text(url: str, token: str, accept: str = "*/*") -> str | None:
+    req = urllib.request.Request(url, headers=_headers(token, accept=accept))
+    try:
+        with urllib.request.urlopen(req, timeout=25) as response:
+            return response.read().decode("utf-8", errors="replace")
+    except Exception:
+        return None
+
+
 def _version_from_text(text: str) -> str | None:
-    match = VERSION_RE.search(text)
+    match = VERSION_RE.search(text or "")
     return match.group(1) if match else None
+
+
+def _version_from_git(branch: str) -> str | None:
+    if not (ROOT / ".git").exists():
+        return None
+    git = _git_exe()
+    if not git:
+        return None
+    try:
+        subprocess.run(
+            [git, "fetch", "origin", branch],
+            cwd=str(ROOT),
+            capture_output=True,
+            timeout=40,
+            creationflags=_win_flags(),
+        )
+        proc = subprocess.run(
+            [git, "show", f"origin/{branch}:app/version.py"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=15,
+            creationflags=_win_flags(),
+        )
+        if proc.returncode == 0:
+            return _version_from_text(proc.stdout)
+    except Exception:
+        return None
+    return None
 
 
 def check_for_update() -> dict:
     settings = load_settings()
     repo = settings["repo"]
     branch = settings["branch"]
-    token = settings["github_token"]
+    token = resolve_token(settings.get("github_token") or "")
     result = {
         **public_settings(settings),
         "update_available": False,
@@ -175,47 +264,68 @@ def check_for_update() -> dict:
         "download_url": None,
         "message": "Estás en la última versión.",
     }
+    remote_version = None
+    notes = ""
+    download_url = f"https://api.github.com/repos/{repo}/zipball/{branch}"
+    source = None
+
     release = None
     try:
         release = _http_json(f"https://api.github.com/repos/{repo}/releases/latest", token)
-        if release.get("message") == "Not Found":
+        if not isinstance(release, dict) or release.get("message") == "Not Found":
             release = None
     except RuntimeError:
         release = None
 
-    remote_version = None
-    notes = ""
-    download_url = None
-    source = None
     if release and not release.get("draft"):
         tag = str(release.get("tag_name") or "").lstrip("vV")
         remote_version = tag or None
         notes = (release.get("body") or "").strip()
-        download_url = release.get("zipball_url")
+        download_url = release.get("zipball_url") or download_url
         source = "release"
-        assets = release.get("assets") or []
-        for asset in assets:
+        for asset in release.get("assets") or []:
             name = (asset.get("name") or "").lower()
             if name.endswith(".zip") and "source" not in name:
                 download_url = asset.get("browser_download_url") or download_url
                 break
 
     if not remote_version:
-        payload = _http_json(
-            f"https://api.github.com/repos/{repo}/contents/app/version.py?ref={branch}",
-            token,
-        )
-        import base64
+        try:
+            payload = _http_json(
+                f"https://api.github.com/repos/{repo}/contents/app/version.py?ref={branch}",
+                token,
+            )
+            import base64
 
-        content = payload.get("content") or ""
-        text = base64.b64decode(content.replace("\n", "")).decode("utf-8", errors="replace") if payload.get("encoding") == "base64" else content
-        remote_version = _version_from_text(text)
-        download_url = f"https://api.github.com/repos/{repo}/zipball/{branch}"
-        source = "branch"
-        notes = f"Último código en la rama {branch}."
+            content = payload.get("content") or ""
+            if payload.get("encoding") == "base64":
+                text = base64.b64decode(content.replace("\n", "")).decode("utf-8", errors="replace")
+            else:
+                text = content
+            remote_version = _version_from_text(text)
+            source = "branch"
+            notes = notes or f"Último código en la rama {branch}."
+        except RuntimeError:
+            remote_version = None
 
     if not remote_version:
-        raise RuntimeError("No se encontró APP_VERSION en GitHub. Sube app/version.py al repositorio.")
+        text = _http_text(
+            f"https://raw.githubusercontent.com/{repo}/{branch}/app/version.py",
+            token,
+        )
+        remote_version = _version_from_text(text or "")
+        if remote_version:
+            source = "raw"
+            notes = notes or f"Último código en la rama {branch}."
+
+    if not remote_version:
+        remote_version = _version_from_git(branch)
+        if remote_version:
+            source = "git"
+            notes = notes or f"Último código en la rama {branch}."
+
+    if not remote_version:
+        raise RuntimeError("No se pudo consultar la versión en GitHub. Revise internet.")
 
     result["remote_version"] = remote_version
     result["source"] = source
@@ -241,8 +351,8 @@ def _store_notice(info: dict) -> None:
     settings_path().write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-def notice_for_ui(*, force: bool = False, max_age_hours: float = 6) -> dict:
-    """Consulta GitHub (con caché) para avisar si hay versión nueva. Nunca lanza error a la UI."""
+def notice_for_ui(*, force: bool = True, max_age_hours: float = 0.5) -> dict:
+    """Consulta GitHub para avisar si hay versión nueva. Nunca lanza error a la UI."""
     settings = load_settings()
     last = float(settings.get("last_check_at") or 0)
     age = time.time() - last
@@ -326,7 +436,7 @@ def download_and_stage(download_url: str | None = None) -> dict:
     if not info.get("update_available"):
         return {**info, "staged": False}
     settings = load_settings()
-    raw = _http_bytes(url, settings["github_token"])
+    raw = _http_bytes(url, resolve_token(settings.get("github_token") or ""))
     data_dir = get_data_dir()
     stage = data_dir / STAGE_DIRNAME
     if stage.exists():

@@ -1676,7 +1676,7 @@ def update_status():
 
 @app.get("/api/update/notice")
 def update_notice():
-    return upd.notice_for_ui()
+    return upd.notice_for_ui(force=True)
 
 
 @app.post("/api/update/dismiss")

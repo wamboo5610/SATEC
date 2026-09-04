@@ -2,7 +2,7 @@
 
 APP_NAME = "SATEC"
 APP_TITLE = "Sistema de Reporte de Asistencia y Control"
-APP_VERSION = "2.8.0"
+APP_VERSION = "2.8.1"
 AUTHOR = "Software WAMBOO TIC"
 ORGANIZATION = "WAMBOO GROUP"
 WINDOW_TITLE = f"{APP_NAME} — {APP_TITLE}  |  {AUTHOR}"
