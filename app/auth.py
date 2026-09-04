@@ -3,6 +3,7 @@ import json
 import os
 import re
 import secrets
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -23,6 +24,25 @@ PUBLIC_PATHS = {
     "/api/auth/login",
     "/api/auth/status",
 }
+
+PASSWORD_CHANGE_ALLOWED = {
+    "/api/auth/login",
+    "/api/auth/logout",
+    "/api/auth/status",
+    "/api/auth/me",
+    "/api/auth/change-password",
+}
+
+ADMIN_ONLY_PREFIXES = (
+    "/api/backup",
+    "/api/update/check",
+    "/api/update/install",
+    "/api/update/settings",
+)
+
+_LOGIN_WINDOW = 300
+_LOGIN_MAX = 8
+_login_attempts: dict[str, list[float]] = {}
 
 MODULES = {
     "dashboard": "Dashboard",
@@ -69,6 +89,10 @@ def _load_auth() -> dict:
 def _save_auth(data: dict) -> None:
     AUTH_PATH.parent.mkdir(parents=True, exist_ok=True)
     AUTH_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    try:
+        os.chmod(AUTH_PATH, 0o600)
+    except OSError:
+        pass
 
 
 def validate_password(password: str) -> tuple[bool, str]:
@@ -250,6 +274,29 @@ def is_public_path(path: str) -> bool:
     return path in PUBLIC_PATHS
 
 
+def login_allowed(key: str) -> tuple[bool, int]:
+    now = time.time()
+    stamps = [t for t in _login_attempts.get(key, []) if now - t < _LOGIN_WINDOW]
+    _login_attempts[key] = stamps
+    if len(stamps) >= _LOGIN_MAX:
+        oldest = min(stamps)
+        wait = int(_LOGIN_WINDOW - (now - oldest))
+        return False, max(wait, 1)
+    return True, 0
+
+
+def record_login_failure(key: str) -> None:
+    _login_attempts.setdefault(key, []).append(time.time())
+
+
+def clear_login_failures(key: str) -> None:
+    _login_attempts.pop(key, None)
+
+
+def _is_admin_only_path(path: str) -> bool:
+    return any(path.startswith(prefix) for prefix in ADMIN_ONLY_PREFIXES)
+
+
 def is_authenticated(request) -> bool:
     if "session" not in request.scope:
         return False
@@ -346,6 +393,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if path.startswith("/api/") and not is_public_path(path):
             if not is_authenticated(request):
                 return JSONResponse({"detail": "No autorizado"}, status_code=401)
+            if request.session.get("must_change_password") and path not in PASSWORD_CHANGE_ALLOWED:
+                return JSONResponse(
+                    {"detail": "Debe cambiar la contraseña antes de continuar"},
+                    status_code=403,
+                )
+            if _is_admin_only_path(path) and not is_admin(request):
+                return JSONResponse({"detail": "Solo administradores"}, status_code=403)
             module = path_module(path)
             if module == "accounts" and not is_admin(request):
                 return JSONResponse({"detail": "Solo administradores"}, status_code=403)

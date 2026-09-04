@@ -47,8 +47,33 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(auth.AuthMiddleware)
-app.add_middleware(SessionMiddleware, secret_key=auth.get_secret_key(), same_site="lax")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=auth.get_secret_key(),
+    same_site="lax",
+    https_only=False,
+    max_age=60 * 60 * 8,
+)
+if IS_VERCEL:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+    )
+else:
+    _port = get_listen_port()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            f"http://127.0.0.1:{_port}",
+            f"http://localhost:{_port}",
+        ],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
 STATIC = Path(__file__).parent / "static"
 
@@ -204,9 +229,17 @@ class EmployeeScheduleUpdate(BaseModel):
 
 @app.post("/api/auth/login")
 def login(data: LoginRequest, request: Request):
-    user = auth.verify_credentials(data.username.strip(), data.password)
+    username = data.username.strip()
+    client = request.client.host if request.client else "local"
+    lock_key = f"{client}:{username.lower()}"
+    allowed, wait = auth.login_allowed(lock_key)
+    if not allowed:
+        raise HTTPException(429, f"Demasiados intentos. Espere {wait} segundos.")
+    user = auth.verify_credentials(username, data.password)
     if not user:
+        auth.record_login_failure(lock_key)
         raise HTTPException(401, "Usuario o contraseña incorrectos")
+    auth.clear_login_failures(lock_key)
     auth.login_user(request, user)
     profile = auth.user_public_view(user)
     return {
@@ -1612,12 +1645,16 @@ def system_status(request: Request):
 
 
 @app.get("/api/backup/info")
-def backup_info_endpoint():
+def backup_info_endpoint(request: Request):
+    if not auth.is_admin(request):
+        raise HTTPException(403, "Solo administradores")
     return bak.backup_info()
 
 
 @app.get("/api/backup/export")
-def export_backup():
+def export_backup(request: Request):
+    if not auth.is_admin(request):
+        raise HTTPException(403, "Solo administradores pueden exportar la base")
     buf, fname = bak.build_backup_zip()
     return StreamingResponse(
         buf,
@@ -1627,7 +1664,9 @@ def export_backup():
 
 
 @app.post("/api/backup/export-to")
-def export_backup_to(data: PathRequest):
+def export_backup_to(data: PathRequest, request: Request):
+    if not auth.is_admin(request):
+        raise HTTPException(403, "Solo administradores pueden exportar la base")
     path = (data.path or "").strip()
     if not path:
         raise HTTPException(400, "Elige dónde guardar el archivo")

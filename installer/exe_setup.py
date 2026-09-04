@@ -11,6 +11,7 @@ import sys
 import threading
 import urllib.request
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -53,7 +54,10 @@ El programa puede avisar cuando exista una versión nueva. Instalar una actualiz
 5. Garantía
 SATEC se entrega «tal cual». WAMBOO TIC no garantiza un funcionamiento ininterrumpido ni se hace responsable por pérdida de datos, interrupciones o uso indebido. Se recomienda exportar respaldos con regularidad.
 
-6. Soporte
+6. Seguridad
+Usted debe cambiar la contraseña inicial al primer ingreso. No comparta cuentas de administrador. Las bases de datos y credenciales permanecen en este equipo; protéjalas con el usuario de Windows y con respaldos cifrados o en un lugar seguro.
+
+7. Soporte
 Para soporte técnico contacte a WAMBOO TIC.
 
 Si no acepta estos términos, cancele la instalación."""
@@ -239,6 +243,76 @@ def copy_payload(src: Path, dest: Path, log) -> None:
     log("Base de datos conservada (si ya existía).")
 
 
+def enable_dpi_awareness() -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        try:
+            import ctypes
+
+            ctypes.windll.user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+
+def protect_data_dir(data_dir: Path, log=None) -> None:
+    """La carpeta de datos queda solo para el usuario de Windows que instala."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    if sys.platform != "win32":
+        try:
+            os.chmod(data_dir, 0o700)
+        except OSError:
+            pass
+        return
+    user = (os.environ.get("USERNAME") or "").strip()
+    if not user:
+        return
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    for group in ("Everyone", "Todos", "Users", "Usuarios", "Authenticated Users"):
+        subprocess.run(
+            ["icacls", str(data_dir), "/remove:g", group],
+            capture_output=True,
+            creationflags=flags,
+        )
+    subprocess.run(
+        ["icacls", str(data_dir), "/grant:r", f"{user}:(OI)(CI)F"],
+        capture_output=True,
+        creationflags=flags,
+    )
+    if log:
+        log("Carpeta de datos protegida (solo este usuario de Windows).")
+
+
+def write_install_record(dest: Path, *, version: str, terms_accepted: bool) -> None:
+    data_dir = dest / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    path = data_dir / "install.json"
+    payload = {}
+    if path.exists():
+        try:
+            stored = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(stored, dict):
+                payload = stored
+        except (json.JSONDecodeError, OSError):
+            payload = {}
+    now = datetime.now(timezone.utc).isoformat()
+    payload.update(
+        {
+            "app": APP_NAME,
+            "author": AUTHOR,
+            "version": version,
+            "installed_at": now,
+            "terms_accepted": bool(terms_accepted),
+            "terms_accepted_at": now if terms_accepted else payload.get("terms_accepted_at"),
+        }
+    )
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def make_shortcut(target: Path, link: Path, workdir: Path, icon: Path, description: str) -> None:
     link.parent.mkdir(parents=True, exist_ok=True)
 
@@ -266,8 +340,7 @@ class SetupApp(tk.Tk):
         self.payload = payload_dir()
         self.app_name, self.version = read_identity(self.payload)
         self.title(f"Instalar {self.app_name} {self.version}  |  {AUTHOR}")
-        self.geometry("640x580")
-        self.minsize(620, 540)
+        self.minsize(680, 620)
         self.configure(bg=BG)
         self.path_var = tk.StringVar(value=str(default_dest()))
         self.accept_var = tk.BooleanVar(value=False)
@@ -276,7 +349,19 @@ class SetupApp(tk.Tk):
         self._busy = False
         self._page = 0
         self._build()
+        self._center()
         self._show(0)
+
+    def _center(self) -> None:
+        self.update_idletasks()
+        width, height = 740, 680
+        screen_w = max(self.winfo_screenwidth(), width)
+        screen_h = max(self.winfo_screenheight(), height)
+        width = min(width, screen_w - 40)
+        height = min(height, screen_h - 80)
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, (screen_h - height) // 3)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
     def _label(self, parent, text, **kwargs) -> tk.Label:
         opts = {"fg": INK, "bg": BG, "font": ("Segoe UI", 10), "anchor": "w"}
@@ -298,7 +383,7 @@ class SetupApp(tk.Tk):
 
     def _build(self) -> None:
         header = tk.Frame(self, bg=PAPER, highlightbackground=LINE, highlightthickness=1)
-        header.pack(fill="x")
+        header.pack(fill="x", side="top")
         inner = tk.Frame(header, bg=PAPER)
         inner.pack(fill="x", padx=24, pady=14)
         tk.Label(inner, text=self.app_name, fg=ACCENT, bg=PAPER, font=("Segoe UI", 20, "bold")).pack(anchor="w")
@@ -308,6 +393,17 @@ class SetupApp(tk.Tk):
             fg=MUTED, bg=PAPER, font=("Segoe UI", 10),
         ).pack(anchor="w")
         tk.Label(inner, text=f"Software {AUTHOR}", fg=GOLD, bg=PAPER, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(2, 0))
+
+        self.footer = tk.Frame(self, bg=PAPER, highlightbackground=LINE, highlightthickness=1)
+        self.footer.pack(fill="x", side="bottom")
+        bar = tk.Frame(self.footer, bg=PAPER)
+        bar.pack(fill="x", padx=20, pady=12)
+        self.cancel_btn = self._btn(bar, "Cancelar", self.destroy)
+        self.cancel_btn.pack(side="left")
+        self.next_btn = self._btn(bar, "Acepto y continuar", self._next, primary=True)
+        self.next_btn.pack(side="right")
+        self.back_btn = self._btn(bar, "Atrás", self._back)
+        self.back_btn.pack(side="right", padx=(0, 8))
 
         self.body = tk.Frame(self, bg=BG)
         self.body.pack(fill="both", expand=True)
@@ -320,35 +416,54 @@ class SetupApp(tk.Tk):
         self._build_opts()
         self._build_prog()
 
-        self.footer = tk.Frame(self, bg=PAPER, highlightbackground=LINE, highlightthickness=1)
-        self.footer.pack(fill="x", side="bottom")
-        bar = tk.Frame(self.footer, bg=PAPER)
-        bar.pack(fill="x", padx=20, pady=12)
-        self.cancel_btn = self._btn(bar, "Cancelar", self.destroy)
-        self.cancel_btn.pack(side="left")
-        self.next_btn = self._btn(bar, "Siguiente", self._next, primary=True)
-        self.next_btn.pack(side="right")
-        self.back_btn = self._btn(bar, "Atrás", self._back)
-        self.back_btn.pack(side="right", padx=(0, 8))
-
     def _build_terms(self) -> None:
         p = self.page_terms
-        self._label(p, "Términos y condiciones", font=("Segoe UI", 13, "bold")).pack(anchor="w", padx=24, pady=(18, 8))
-        self._label(p, "Lea el siguiente acuerdo. Debe aceptarlo para continuar.", fg=MUTED).pack(anchor="w", padx=24)
+        self._label(p, "Términos y condiciones", font=("Segoe UI", 13, "bold")).pack(anchor="w", padx=24, pady=(16, 6))
+        self._label(p, "Lea el acuerdo. Debe marcar Acepto para poder instalar.", fg=MUTED).pack(anchor="w", padx=24)
+
+        self.accept_card = tk.Frame(p, bg="#E8F6EE", highlightbackground="#C0392B", highlightthickness=2)
+        self.accept_card.pack(side="bottom", fill="x", padx=24, pady=(8, 14))
+        inner = tk.Frame(self.accept_card, bg="#E8F6EE")
+        inner.pack(fill="x", padx=12, pady=10)
+        accept = tk.Checkbutton(
+            inner,
+            text="Acepto los términos y condiciones de uso de SATEC",
+            variable=self.accept_var,
+            command=self._sync_buttons,
+            bg="#E8F6EE",
+            fg=INK,
+            selectcolor="#FFFFFF",
+            activebackground="#E8F6EE",
+            activeforeground=INK,
+            font=("Segoe UI", 11, "bold"),
+            anchor="w",
+            padx=4,
+            pady=4,
+        )
+        accept.pack(anchor="w", fill="x")
+        self.accept_hint = tk.Label(
+            inner,
+            text="Marque esta casilla para habilitar el botón «Acepto y continuar».",
+            bg="#E8F6EE",
+            fg="#8A1F1F",
+            font=("Segoe UI", 9),
+            anchor="w",
+        )
+        self.accept_hint.pack(anchor="w", pady=(4, 0))
+        for widget in (self.accept_card, inner, self.accept_hint):
+            widget.bind("<Button-1>", self._toggle_accept)
+
         box = scrolledtext.ScrolledText(
             p, font=("Segoe UI", 9), bg=PAPER, fg=INK, relief="solid", bd=1,
-            wrap="word", padx=10, pady=10,
+            wrap="word", padx=10, pady=10, height=12,
         )
-        box.pack(fill="both", expand=True, padx=24, pady=10)
+        box.pack(fill="both", expand=True, padx=24, pady=(10, 6))
         box.insert("1.0", TERMS)
         box.configure(state="disabled")
-        accept = tk.Checkbutton(
-            p, text="Acepto los términos y condiciones de uso de SATEC",
-            variable=self.accept_var, command=self._sync_buttons,
-            bg=BG, fg=INK, selectcolor=PAPER, activebackground=BG,
-            font=("Segoe UI", 10, "bold"), anchor="w",
-        )
-        accept.pack(anchor="w", padx=24, pady=(4, 12))
+
+    def _toggle_accept(self, _event=None) -> None:
+        self.accept_var.set(not self.accept_var.get())
+        self._sync_buttons()
 
     def _build_opts(self) -> None:
         p = self.page_opts
@@ -400,9 +515,20 @@ class SetupApp(tk.Tk):
         self._sync_buttons()
 
     def _sync_buttons(self) -> None:
+        accepted = bool(self.accept_var.get())
+        if hasattr(self, "accept_card"):
+            self.accept_card.configure(highlightbackground=ACCENT if accepted else "#C0392B")
+        if hasattr(self, "accept_hint"):
+            self.accept_hint.configure(
+                text="Términos aceptados. Puede continuar." if accepted else "Marque esta casilla para habilitar el botón «Acepto y continuar».",
+                fg=ACCENT if accepted else "#8A1F1F",
+            )
         self.back_btn.configure(state="normal" if self._page == 1 and not self._busy else "disabled")
         if self._page == 0:
-            self.next_btn.configure(text="Siguiente", state="normal" if self.accept_var.get() else "disabled")
+            self.next_btn.configure(
+                text="Acepto y continuar",
+                state="normal" if accepted else "disabled",
+            )
         elif self._page == 1:
             self.next_btn.configure(text="Instalar", state="normal")
         else:
@@ -457,7 +583,11 @@ class SetupApp(tk.Tk):
 
     def _install(self, dest: Path) -> None:
         try:
+            if not self.accept_var.get():
+                raise RuntimeError("Debe aceptar los términos y condiciones para instalar.")
             copy_payload(self.payload, dest, self.log)
+            write_install_record(dest, version=self.version, terms_accepted=True)
+            protect_data_dir(dest / "data", self.log)
             python = resolve_python(dest, self.log)
             self.log("Instalando herramientas de empaquetado…")
             run([str(python), "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"])
@@ -475,6 +605,7 @@ class SetupApp(tk.Tk):
                 configure_embed_runtime(dest / "runtime")
             self.log("Comprobando motor…")
             run([str(python), "-c", engine_check_code(dest)], cwd=dest)
+            protect_data_dir(dest / "data")
             icon = dest / "assets" / "icon.ico"
             iniciar = dest / "INICIAR.bat"
             if self.desktop_var.get():
@@ -517,13 +648,17 @@ class SetupApp(tk.Tk):
         if messagebox.askyesno(
             self.app_name,
             f"{self.app_name} se instaló en:\n{dest}\n\n"
-            "Usuario: admin\nContraseña: admin123\nCámbiela al entrar.\n\n¿Abrir ahora?",
+            "Usuario inicial: admin\n"
+            "Contraseña inicial: admin123\n"
+            "Por seguridad deberá cambiarla al entrar.\n\n"
+            "¿Abrir ahora?",
         ):
             subprocess.Popen(["cmd.exe", "/c", str(dest / "INICIAR.bat")], cwd=str(dest))
         self.destroy()
 
 
 def main() -> int:
+    enable_dpi_awareness()
     try:
         payload_dir()
     except FileNotFoundError as exc:

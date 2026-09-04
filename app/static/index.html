@@ -1742,6 +1742,10 @@ async function changePassword() {
     document.getElementById('password-modal').classList.remove('open');
     document.getElementById('pwd-cancel-btn').style.display = '';
     toast('Contraseña actualizada');
+    loadDashboard();
+    loadServerInfo();
+    loadSedeFilters();
+    checkUpdateNotice();
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -4425,6 +4429,7 @@ setEasyReportType('total');
 
 applyAttendanceModeUI();
 checkAuth().then(() => {
+  if (currentUser && currentUser.must_change_password) return;
   loadDashboard();
   loadServerInfo();
   loadSedeFilters();
