@@ -1,0 +1,17 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+data/attendance.db
+data/attendance.db-*
+data/auth.json
+data/webview/
+data/*.log
+data/_update_stage/
+data/_restore_tmp/
+data/update.json
+data/apply_update.bat
+dist/
+DESCARGAS_LOCALES/
+REPORTES/*.xlsx
+.EXT/

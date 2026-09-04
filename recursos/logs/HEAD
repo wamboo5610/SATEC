@@ -1,0 +1,22 @@
+0000000000000000000000000000000000000000 061840aa88beeeed343bcadea001279c2f482f19 wamboo5610 <wamboo5610@gmail.com> 1781756896 -0500	commit (initial): Initial commit
+061840aa88beeeed343bcadea001279c2f482f19 2d9fcab69ba5d40489596ef1698697e923b39c03 wamboo5610 <wamboo5610@gmail.com> 1781757396 -0500	commit: Configurar SISAT para despliegue en Vercel con FastAPI y rutas de datos adaptadas.
+2d9fcab69ba5d40489596ef1698697e923b39c03 ef677c305a1cafb4ae1cbc96e54a7e3746e280b5 wamboo5610 <wamboo5610@gmail.com> 1781757911 -0500	commit: Corregir deteccion FastAPI en Vercel: dependencias en pyproject.toml y vercel.json
+ef677c305a1cafb4ae1cbc96e54a7e3746e280b5 ce6ee8e609ffe7eb42e099728f15d10357ad99fa wamboo5610 <wamboo5610@gmail.com> 1781757917 -0500	commit: Eliminar index.py duplicado que confundia el entrypoint de Vercel
+ce6ee8e609ffe7eb42e099728f15d10357ad99fa 57d8d64d34764f82ef6c0e4d47a7611598f3cb8e wamboo5610 <wamboo5610@gmail.com> 1781758581 -0500	commit: Fix Vercel 404: api/index.py con Mangum y rutas explicitas en vercel.json
+57d8d64d34764f82ef6c0e4d47a7611598f3cb8e 159a016573908d3327befee1d116779b7a8d12ac wamboo5610 <wamboo5610@gmail.com> 1781759172 -0500	commit: UI: topbar tema, busqueda empleados, descargas reloj y respaldo BD
+159a016573908d3327befee1d116779b7a8d12ac 01613eb8051eeb1f844c931727cec32c4b0f9373 wamboo5610 <wamboo5610@gmail.com> 1781792339 -0500	commit: Descarga local offline, empleados por sede y descargas directas del reloj
+01613eb8051eeb1f844c931727cec32c4b0f9373 1a232fb016fa986e425fe3b63f717aca712e141f wamboo5610 <wamboo5610@gmail.com> 1781792383 -0500	commit: Excluir base de datos local y credenciales del repositorio
+1a232fb016fa986e425fe3b63f717aca712e141f 2cbb9f455162f3d9f8ce55e84afd647474572aa7 wamboo5610 <wamboo5610@gmail.com> 1781793244 -0500	commit: Usuarios con permisos por modulo, contraseñas seguras y panel de cuentas
+2cbb9f455162f3d9f8ce55e84afd647474572aa7 2305e30974b709230998635ddc2c0e1efd293d3f wamboo5610 <wamboo5610@gmail.com> 1781805707 -0500	commit: Mover menu de usuario, cerrar sesion y cambiar clave a la barra superior
+2305e30974b709230998635ddc2c0e1efd293d3f b666e01bcd930067e1f8599c02d855b4b1b215bb wamboo5610 <wamboo5610@gmail.com> 1781805952 -0500	commit: Soporte variables Vercel para admin y scripts de sincronizacion
+b666e01bcd930067e1f8599c02d855b4b1b215bb e760d96857b7f7d83138e1dbc27e22fdfdf97601 wamboo5610 <wamboo5610@gmail.com> 1781817429 -0500	commit: Horarios laborales lun-vie y feriados en tardanzas
+e760d96857b7f7d83138e1dbc27e22fdfdf97601 5ad6a6cde29470bec7b8fe017008a39b72a959c2 wamboo5610 <wamboo5610@gmail.com> 1781818403 -0500	commit: Control 4 marcaciones diarias y tardanzas mensuales
+5ad6a6cde29470bec7b8fe017008a39b72a959c2 1ad357cdc2037fd202423979cb8a13252067b8c3 wamboo5610 <wamboo5610@gmail.com> 1781819213 -0500	commit: Mejorar modo facil: pestañas Totales, Tardanzas y Asistencia
+1ad357cdc2037fd202423979cb8a13252067b8c3 e69d20679367927a8b2fda5f147e23c5606513d6 wamboo5610 <wamboo5610@gmail.com> 1781819562 -0500	commit: Modo facil: solo reporte total y reporte por persona
+e69d20679367927a8b2fda5f147e23c5606513d6 e048e130f80cf099d130013f692ee4c26de244c0 wamboo5610 <wamboo5610@gmail.com> 1781819636 -0500	commit: Modo facil: generar reporte solo muestra datos sin descargar Excel
+e048e130f80cf099d130013f692ee4c26de244c0 1b1c9ded59a272d74efbca07ccf6ccebd05ba0b5 wamboo5610 <wamboo5610@gmail.com> 1781819777 -0500	commit: Modo facil por persona: sin pestaña Totales, solo Tardanzas y Asistencia
+1b1c9ded59a272d74efbca07ccf6ccebd05ba0b5 46b6e231e42231145478c1a9ac5b08e7bd931bd4 wamboo5610 <wamboo5610@gmail.com> 1781820595 -0500	commit: Evitar marcaciones duplicadas entre Excel y relojes
+46b6e231e42231145478c1a9ac5b08e7bd931bd4 ad18924c9d4967cf3493e8752e93f6b6788c0383 wamboo5610 <wamboo5610@gmail.com> 1781820801 -0500	commit: Modo facil: filtrar reportes solo por mes seleccionado
+ad18924c9d4967cf3493e8752e93f6b6788c0383 e9e68f1da90363e0f5675268173486dd4adc97cc wamboo5610 <wamboo5610@gmail.com> 1781881960 -0500	commit: Excel tardanzas: resaltar totales bruto/tolerancia/neto, tolerancia mensual 20 min, fuente reloj/excel en modo facil
+e9e68f1da90363e0f5675268173486dd4adc97cc 005fa803697decd2459c36e1a38967c86c941eac wamboo5610 <wamboo5610@gmail.com> 1781882423 -0500	commit: Actualizar claves admin en Vercel: admin / Admin2026 y auth.json semilla
+005fa803697decd2459c36e1a38967c86c941eac ec16f206b8e1f24ae84aa7d9218319073880f00b wamboo5610 <wamboo5610@gmail.com> 1782135584 -0500	commit: Modo avanzado: reporte filtrado por un solo empleado

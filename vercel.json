@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "env": {
+    "SISAT_ADMIN_USER": "admin",
+    "SISAT_ADMIN_PASSWORD": "Admin2026",
+    "SESSION_SECRET": "1f8765b7a1d08895159f0c482923db378cb121ca467023cee6cae4e81cab6112"
+  },
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api/index.py"
+    }
+  ]
+}

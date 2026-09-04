@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acceso — SISAT | WAMBOO TIC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/theme.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background:
+        linear-gradient(180deg, rgba(8, 32, 24, .58), rgba(8, 24, 48, .62)),
+        url('/assets/login-bg.jpg') center/cover no-repeat,
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-wrap { width: 100%; max-width: 420px; }
+    .login-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .login-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 32px 28px;
+      box-shadow: var(--shadow);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .logo-icon, .logo-img {
+      width: 56px;
+      height: 56px;
+      border-radius: 18px;
+      object-fit: cover;
+      box-shadow: 0 8px 18px rgba(8,64,168,.18);
+    }
+    .logo-icon {
+      background: linear-gradient(135deg, #088830, #0840a8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .logo h1 { font-size: 18px; font-weight: 800; line-height: 1.3; }
+    .logo p { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 15px;
+    }
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(8, 136, 48, 0.18);
+    }
+    .btn {
+      width: 100%;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 14px;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, #088830, #0840a8);
+      color: #fff;
+      transition: 0.15s;
+      margin-top: 8px;
+    }
+    .btn:hover { filter: brightness(1.05); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .alert {
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .alert.show { display: block; }
+    .alert-error {
+      background: var(--alert-error-bg);
+      border: 1px solid var(--alert-error-border);
+      color: var(--alert-error-text);
+    }
+    .hint {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.6;
+      text-align: center;
+    }
+    @media (max-width: 480px) {
+      .login-card { padding: 24px 20px; }
+      .logo h1 { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-top">
+      <span style="font-size:12px;color:#f3faf6;font-weight:800;letter-spacing:.08em">SISAT · ESCRITORIO</span>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema">
+        <span id="theme-icon">🌙</span>
+        <span id="theme-label">Oscuro</span>
+      </button>
+    </div>
+    <div class="login-card">
+      <div class="logo">
+        <img class="logo-img" src="/assets/icon.png" alt="SISAT">
+        <div>
+          <h1>Sistema de Control de Asistencia</h1>
+          <p>Aplicación de escritorio para PC</p>
+        </div>
+      </div>
+      <div class="alert alert-error" id="login-error"></div>
+      <form id="login-form">
+        <div class="form-group">
+          <label for="username">Usuario</label>
+          <input id="username" name="username" autocomplete="username" required placeholder="Tu usuario">
+        </div>
+        <div class="form-group">
+          <label for="password">Contraseña</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="••••••••">
+        </div>
+        <button class="btn" type="submit" id="login-btn">Ingresar al sistema</button>
+      </form>
+      <div class="hint">
+        Acceso restringido al personal autorizado.<br>
+        Si olvidaste tu contraseña, contacta al administrador del sistema.<br>
+        <strong style="color:var(--text);display:inline-block;margin-top:8px">Autor: WAMBOO TIC</strong>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('sca-theme', theme);
+      const isDark = theme === 'dark';
+      document.getElementById('theme-icon').textContent = isDark ? '🌙' : '☀️';
+      document.getElementById('theme-label').textContent = isDark ? 'Oscuro' : 'Claro';
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      applyTheme(current === 'dark' ? 'light' : 'dark');
+    }
+
+    applyTheme(localStorage.getItem('sca-theme') || 'light');
+    document.getElementById('theme-toggle').onclick = toggleTheme;
+
+    document.getElementById('login-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('login-btn');
+      const errEl = document.getElementById('login-error');
+      errEl.classList.remove('show');
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            username: document.getElementById('username').value.trim(),
+            password: document.getElementById('password').value,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: 'Credenciales incorrectas' }));
+          throw new Error(err.detail || 'Credenciales incorrectas');
+        }
+        window.location.href = '/';
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.add('show');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Ingresar al sistema';
+      }
+    };
+  </script>
+</body>
+</html>

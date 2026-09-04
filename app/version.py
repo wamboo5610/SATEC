@@ -1,0 +1,13 @@
+"""Identidad del producto — aplicación de escritorio WAMBOO TIC."""
+
+APP_NAME = "SISAT"
+APP_TITLE = "Sistema de Control de Asistencia"
+APP_VERSION = "2.2.0"
+AUTHOR = "WAMBOO TIC"
+ORGANIZATION = "WAMBOO TIC"
+WINDOW_TITLE = f"{APP_NAME} — {APP_TITLE}  |  {AUTHOR}"
+APP_ID = "WAMBOOTIC.SISAT.Desktop"
+GITHUB_OWNER = "wamboo5610"
+GITHUB_REPO = "SISAT"
+GITHUB_BRANCH = "main"
+GITHUB_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}"
