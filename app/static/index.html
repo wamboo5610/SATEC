@@ -2227,8 +2227,49 @@ async function api(path, opts = {}) {
   return res;
 }
 
-async function downloadAuthenticated(url, fallbackName = 'descarga') {
-  const res = await fetch(url, { credentials: 'same-origin' });
+function exportKindFromUrl(url) {
+  const [path] = url.split('?');
+  if (path.includes('/reports/tardiness/monthly/export/xlsx')) return 'monthly_xlsx';
+  if (path.includes('/reports/tardiness/monthly/export/csv')) return 'monthly_csv';
+  if (path.includes('/reports/tardiness/export/xlsx')) return 'tardiness_xlsx';
+  if (path.includes('/reports/tardiness/export/csv')) return 'tardiness_csv';
+  if (path.includes('/attendance/export/xlsx')) return 'attendance_xlsx';
+  if (path.includes('/attendance/export/csv')) return 'attendance_csv';
+  if (path.includes('/users/export/csv')) return 'users_csv';
+  if (path.includes('/backup/export')) return 'backup_zip';
+  const offline = path.match(/\/offline\/downloads\/(\d+)\/export/);
+  if (offline) return 'offline_zip';
+  return null;
+}
+
+async function downloadAuthenticated(url, fallbackName = 'descarga.xlsx') {
+  const kind = exportKindFromUrl(url);
+  if (!kind) throw new Error('No se pudo exportar este archivo');
+  const parsed = new URL(url, window.location.origin);
+  const payload = { kind };
+  parsed.searchParams.forEach((value, key) => {
+    if (value !== '') payload[key] = value;
+  });
+  const offline = url.split('?')[0].match(/\/offline\/downloads\/(\d+)\/export/);
+  if (offline) payload.download_id = +offline[1];
+  if (payload.sede_id) payload.sede_id = +payload.sede_id;
+  if (payload.device_id) payload.device_id = +payload.device_id;
+  if (payload.year) payload.year = +payload.year;
+  if (payload.month) payload.month = +payload.month;
+
+  let dest = null;
+  if (window.pywebview && window.pywebview.api && window.pywebview.api.save_file) {
+    dest = await window.pywebview.api.save_file(fallbackName);
+    if (!dest) return;
+    payload.path = dest;
+  }
+
+  const res = await fetch('/api/export/save', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
   if (res.status === 401) {
     window.location.href = '/login';
     throw new Error('Sesión expirada');
@@ -2237,23 +2278,22 @@ async function downloadAuthenticated(url, fallbackName = 'descarga') {
     const err = await res.json().catch(() => ({}));
     throw new Error(parseApiError(res, err));
   }
-  const blob = await res.blob();
-  const dispo = res.headers.get('Content-Disposition') || '';
-  const match = dispo.match(/filename\*?=(?:UTF-8''|"?)([^";]+)"?/i);
-  let filename = fallbackName;
-  if (match) {
-    try { filename = decodeURIComponent(match[1].replace(/"/g, '').trim()); }
-    catch { filename = match[1].replace(/"/g, '').trim(); }
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('json')) {
+    const data = await res.json();
+    toast('Archivo guardado en: ' + (data.path || dest || 'REPORTES'));
+    return;
   }
+  const blob = await res.blob();
   const href = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = href;
-  a.download = filename;
+  a.download = fallbackName;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(href);
-  toast('Descarga lista: ' + filename);
+  toast('Descarga lista: ' + fallbackName);
 }
 
 function updateClock() {

@@ -44,17 +44,34 @@ class DesktopBridge:
             return str(result[0])
         return None
 
-    def save_file(self, filename: str = "satec_base_datos.zip") -> str | None:
+    def save_file(self, filename: str = "archivo.xlsx", file_types=None) -> str | None:
         webview, window = _window()
         dialog = _dialog("save")
         if window is None or dialog is None:
             return None
-        documents = str(Path.home() / "Documents")
+        try:
+            from app.paths import get_reportes_dir
+
+            directory = str(get_reportes_dir())
+        except Exception:
+            directory = str(Path.home() / "Documents")
+        suffix = Path(filename).suffix.lower()
+        if not file_types:
+            if suffix == ".csv":
+                file_types = ("CSV (*.csv)",)
+            elif suffix == ".zip":
+                file_types = ("Archivo ZIP (*.zip)",)
+            else:
+                file_types = ("Excel (*.xlsx)",)
+        elif isinstance(file_types, str):
+            file_types = (file_types,)
+        else:
+            file_types = tuple(str(item) for item in file_types)
         result = window.create_file_dialog(
             dialog,
-            directory=documents,
+            directory=directory,
             save_filename=filename,
-            file_types=("Respaldo SATEC (*.zip)",),
+            file_types=file_types,
         )
         if not result:
             return None

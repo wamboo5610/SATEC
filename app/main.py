@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse, PlainTextResponse, RedirectResponse, JSONResponse
+from fastapi.responses import FileResponse, StreamingResponse, PlainTextResponse, RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from openpyxl import Workbook
@@ -28,7 +28,7 @@ from . import recursos_tardiness as recursos
 from . import offline_download as offdl
 from . import backup as bak
 from . import updater as upd
-from .paths import get_data_dir, IS_VERCEL, is_desktop, get_listen_port, assets_dir
+from .paths import get_data_dir, IS_VERCEL, is_desktop, get_listen_port, assets_dir, get_reportes_dir
 from .database import DB_PATH
 from .auth import AUTH_PATH
 from .version import APP_NAME, APP_TITLE, APP_VERSION, AUTHOR
@@ -208,6 +208,21 @@ class OfflineDownloadRequest(BaseModel):
 
 class PathRequest(BaseModel):
     path: str
+
+
+class ExportSaveRequest(BaseModel):
+    kind: str
+    path: str | None = None
+    date_from: str | None = None
+    date_to: str | None = None
+    user_id: str | None = None
+    sede_id: int | None = None
+    device_id: int | None = None
+    source_mode: str = "auto"
+    format: str = "person"
+    year: int | None = None
+    month: int | None = None
+    download_id: int | None = None
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -850,6 +865,165 @@ def tardiness_report(
 
 def _tardiness_export_data(date_from, date_to, user_id, sede_id, device_id, source_mode="auto"):
     return db.get_tardiness_report(date_from, date_to, sede_id, device_id, user_id, source_mode)
+
+
+XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _as_bytes(buf) -> bytes:
+    if isinstance(buf, (bytes, bytearray)):
+        return bytes(buf)
+    if isinstance(buf, str):
+        return buf.encode("utf-8-sig")
+    if hasattr(buf, "getvalue"):
+        value = buf.getvalue()
+        return value if isinstance(value, (bytes, bytearray)) else str(value).encode("utf-8-sig")
+    if hasattr(buf, "read"):
+        if hasattr(buf, "seek"):
+            buf.seek(0)
+        value = buf.read()
+        return value if isinstance(value, (bytes, bytearray)) else str(value).encode("utf-8-sig")
+    return bytes(buf)
+
+
+def send_or_save(buf, fname: str, media: str, dest_path: str | None = None):
+    raw = _as_bytes(buf)
+    if not dest_path and is_desktop():
+        dest_path = str(get_reportes_dir() / fname)
+    if dest_path:
+        dest = Path(dest_path).expanduser()
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(raw)
+        return {"ok": True, "path": str(dest), "filename": dest.name}
+    return Response(
+        content=raw,
+        media_type=media,
+        headers={
+            "Content-Disposition": f'inline; filename="{fname}"',
+            "X-Filename": fname,
+        },
+    )
+
+
+@app.post("/api/export/save")
+def export_save(data: ExportSaveRequest, request: Request):
+    """Exporta por POST (con sesión). Evita el 401 de WebView2 en descargas GET."""
+    kind = (data.kind or "").strip()
+    dest = (data.path or "").strip() or None
+    stamp = datetime.now().strftime("%Y%m%d_%H%M")
+
+    if kind == "tardiness_xlsx":
+        report = _tardiness_export_data(
+            data.date_from, data.date_to, data.user_id, data.sede_id, data.device_id, data.source_mode
+        )
+        meta = _export_meta(data.date_from, data.date_to, data.sede_id, data.device_id)
+        return send_or_save(
+            rep.build_excel_tardiness(report, meta),
+            f"tardanzas_por_empleado_{stamp}.xlsx",
+            XLSX_MEDIA,
+            dest,
+        )
+    if kind == "tardiness_csv":
+        report = _tardiness_export_data(
+            data.date_from, data.date_to, data.user_id, data.sede_id, data.device_id, data.source_mode
+        )
+        if data.format == "detail":
+            headers, rows = rep.tardiness_detail_csv_rows(report)
+            fname = f"tardanzas_detalle_{stamp}.csv"
+        else:
+            headers, rows = rep.tardiness_person_csv_rows(report)
+            fname = f"tardanzas_por_empleado_{stamp}.csv"
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        writer.writerows(rows)
+        return send_or_save(output.getvalue(), fname, "text/csv; charset=utf-8", dest)
+    if kind == "monthly_xlsx":
+        now = datetime.now()
+        y = data.year or now.year
+        m = data.month or now.month
+        try:
+            report = db.get_monthly_tardiness_report(y, m, data.sede_id, data.device_id, data.user_id)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        meta = _export_meta(report["date_from"], report["date_to"], data.sede_id, data.device_id)
+        meta["month_label"] = report.get("month_label", "")
+        return send_or_save(
+            rep.build_excel_monthly_tardiness(report, meta),
+            f"tardanzas_mensual_{y}_{m:02d}_{datetime.now().strftime('%H%M')}.xlsx",
+            XLSX_MEDIA,
+            dest,
+        )
+    if kind == "monthly_csv":
+        now = datetime.now()
+        y = data.year or now.year
+        m = data.month or now.month
+        try:
+            report = db.get_monthly_tardiness_report(y, m, data.sede_id, data.device_id, data.user_id)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        headers, rows = rep.monthly_tardiness_csv_rows(report)
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        writer.writerows(rows)
+        return send_or_save(
+            output.getvalue(),
+            f"tardanzas_mensual_{y}_{m:02d}_{datetime.now().strftime('%H%M')}.csv",
+            "text/csv; charset=utf-8",
+            dest,
+        )
+    if kind == "attendance_csv":
+        rows = _fetch_export_rows(data.date_from, data.date_to, data.user_id, data.sede_id, data.device_id)
+        headers, body = records_to_export(rows)
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(headers)
+        writer.writerows(body)
+        return send_or_save(output.getvalue(), f"asistencia_{stamp}.csv", "text/csv; charset=utf-8", dest)
+    if kind == "attendance_xlsx":
+        rows = _fetch_export_rows(data.date_from, data.date_to, data.user_id, data.sede_id, data.device_id)
+        meta = _export_meta(data.date_from, data.date_to, data.sede_id, data.device_id)
+        if data.format == "sede":
+            buf = rep.build_excel_by_sede(rows, meta)
+            fname = f"asistencia_por_sede_{stamp}.xlsx"
+        elif data.format == "flat":
+            headers, body = records_to_export(rows)
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Asistencia"
+            ws.append(headers)
+            for row in body:
+                ws.append(row)
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+            fname = f"asistencia_{stamp}.xlsx"
+        else:
+            buf = rep.build_excel_by_person(rows, meta)
+            fname = f"asistencia_por_persona_{stamp}.xlsx"
+        return send_or_save(buf, fname, XLSX_MEDIA, dest)
+    if kind == "users_csv":
+        serial = _device_serial(data.device_id) if data.device_id else None
+        users = _dedupe_users(db.get_users(serial, data.sede_id))
+        return send_or_save(_users_csv_bytes(users), f"empleados_{stamp}.csv", "text/csv; charset=utf-8", dest)
+    if kind == "backup_zip":
+        if not auth.is_admin(request):
+            raise HTTPException(403, "Solo administradores pueden exportar la base")
+        buf, fname = bak.build_backup_zip()
+        return send_or_save(buf, fname, "application/zip", dest)
+    if kind == "offline_zip":
+        if not data.download_id:
+            raise HTTPException(400, "Falta la descarga")
+        row = db.get_offline_download(data.download_id)
+        if not row or not row.get("snapshot_file"):
+            raise HTTPException(404, "Descarga no encontrada")
+        try:
+            path = offdl.resolve_snapshot_path(row["snapshot_file"])
+        except FileNotFoundError as e:
+            raise HTTPException(404, str(e))
+        return send_or_save(path.read_bytes(), row["snapshot_file"], "application/zip", dest)
+    raise HTTPException(400, "Tipo de exportación no válido")
 
 
 @app.get("/api/reports/tardiness/export/xlsx")
@@ -1816,7 +1990,7 @@ async def login_page(request: Request):
 async def index(request: Request):
     if not auth.is_authenticated(request):
         return RedirectResponse("/login")
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-store"})
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
