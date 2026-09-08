@@ -859,8 +859,9 @@ def export_tardiness_xlsx(
     user_id: str | None = None,
     sede_id: int | None = None,
     device_id: int | None = None,
+    source_mode: str = "auto",
 ):
-    data = _tardiness_export_data(date_from, date_to, user_id, sede_id, device_id)
+    data = _tardiness_export_data(date_from, date_to, user_id, sede_id, device_id, source_mode)
     meta = _export_meta(date_from, date_to, sede_id, device_id)
     buf = rep.build_excel_tardiness(data, meta)
     fname = f"tardanzas_por_empleado_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
@@ -879,8 +880,9 @@ def export_tardiness_csv(
     sede_id: int | None = None,
     device_id: int | None = None,
     format: str = "person",
+    source_mode: str = "auto",
 ):
-    data = _tardiness_export_data(date_from, date_to, user_id, sede_id, device_id)
+    data = _tardiness_export_data(date_from, date_to, user_id, sede_id, device_id, source_mode)
     if format == "detail":
         headers, rows = rep.tardiness_detail_csv_rows(data)
         fname = f"tardanzas_detalle_{datetime.now().strftime('%Y%m%d_%H%M')}.csv"
@@ -1044,8 +1046,17 @@ def add_device(data: DeviceCreate):
 
 @app.patch("/api/devices/{device_id}")
 def patch_device(device_id: int, data: DeviceUpdate):
-    db.update_device(device_id, **data.model_dump(exclude_none=True))
-    return {"message": "Actualizado"}
+    if not db.get_device(device_id):
+        raise HTTPException(404, "Reloj no encontrado")
+    payload = data.model_dump(exclude_none=True)
+    if "name" in payload:
+        payload["name"] = str(payload["name"]).strip()
+        if not payload["name"]:
+            raise HTTPException(400, "El nombre del reloj no puede estar vacío")
+    if not payload:
+        raise HTTPException(400, "Nada que actualizar")
+    db.update_device(device_id, **payload)
+    return {"message": "Nombre actualizado"}
 
 
 @app.delete("/api/devices/{device_id}")

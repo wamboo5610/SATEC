@@ -2227,6 +2227,35 @@ async function api(path, opts = {}) {
   return res;
 }
 
+async function downloadAuthenticated(url, fallbackName = 'descarga') {
+  const res = await fetch(url, { credentials: 'same-origin' });
+  if (res.status === 401) {
+    window.location.href = '/login';
+    throw new Error('Sesión expirada');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(parseApiError(res, err));
+  }
+  const blob = await res.blob();
+  const dispo = res.headers.get('Content-Disposition') || '';
+  const match = dispo.match(/filename\*?=(?:UTF-8''|"?)([^";]+)"?/i);
+  let filename = fallbackName;
+  if (match) {
+    try { filename = decodeURIComponent(match[1].replace(/"/g, '').trim()); }
+    catch { filename = match[1].replace(/"/g, '').trim(); }
+  }
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(href);
+  toast('Descarga lista: ' + filename);
+}
+
 function updateClock() {
   const el = document.getElementById('live-clock');
   if (el) el.textContent = new Date().toLocaleString('es-PE', { weekday:'short', day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
@@ -2928,12 +2957,14 @@ async function loadMonthlyTardinessReport(scrollToCard = false) {
 
 function exportMonthlyTardinessXLSX() {
   initMonthlyPeriod();
-  window.open('/api/reports/tardiness/monthly/export/xlsx?' + getMonthlyQuery(), '_blank');
+  downloadAuthenticated('/api/reports/tardiness/monthly/export/xlsx?' + getMonthlyQuery(), 'tardanzas_mes.xlsx')
+    .catch(e => toast(e.message, 'error'));
 }
 
 function exportMonthlyTardinessCSV() {
   initMonthlyPeriod();
-  window.open('/api/reports/tardiness/monthly/export/csv?' + getMonthlyQuery(), '_blank');
+  downloadAuthenticated('/api/reports/tardiness/monthly/export/csv?' + getMonthlyQuery(), 'tardanzas_mes.csv')
+    .catch(e => toast(e.message, 'error'));
 }
 
 function renderPunchObservations(r, prefix = 'punch-obs') {
@@ -3320,7 +3351,10 @@ async function loadDevices() {
             </div>
             ${syncFail ? err : ''}
           </div>
-          <button class="btn btn-danger btn-sm" onclick="deleteDevice(${d.id})">🗑 Eliminar</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick='renameDevice(${d.id}, ${JSON.stringify(d.name || "")})'>✎ Nombre</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteDevice(${d.id})">🗑 Eliminar</button>
+          </div>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:8px">
           <span style="font-size:11px;color:var(--muted);width:100%;margin-bottom:2px">${excel ? 'Dispositivo importado (Excel):' : 'Acciones del reloj (conexión directa):'}</span>
@@ -3462,6 +3496,19 @@ async function downloadDeviceFile(id, type) {
   }
 }
 
+async function renameDevice(id, currentName) {
+  const name = prompt('Nuevo nombre del reloj:', currentName || '');
+  if (name === null) return;
+  const trimmed = name.trim();
+  if (!trimmed) return toast('El nombre no puede estar vacío', 'error');
+  try {
+    await api(`/api/devices/${id}`, { method: 'PATCH', body: JSON.stringify({ name: trimmed }) });
+    toast('Nombre del reloj actualizado');
+    loadDevices();
+    loadSedeFilters();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
 async function deleteDevice(id) {
   if (!confirm('¿Eliminar dispositivo?')) return;
   await api(`/api/devices/${id}`, { method: 'DELETE' });
@@ -3499,8 +3546,7 @@ async function exportBackupAsync() {
       toast('Base de datos exportada: ' + (r.path || chosen));
       return;
     }
-    window.open('/api/backup/export', '_blank');
-    toast('Exportando base de datos...');
+    await downloadAuthenticated('/api/backup/export', 'satec_base_datos.zip');
   } catch (e) { toast(e.message, 'error'); }
 }
 
@@ -3622,8 +3668,7 @@ async function dismissUpdateBanner() {
 }
 
 function exportAllUsers() {
-  window.open('/api/users/export/csv', '_blank');
-  toast('Descargando lista de empleados...');
+  downloadAuthenticated('/api/users/export/csv', 'empleados.csv').catch(e => toast(e.message, 'error'));
 }
 
 let easyEmployees = [];
@@ -3673,23 +3718,23 @@ function getAdvancedFilterUserId() {
 }
 
 function getFilterQuery(opts = {}) {
+  const params = new URLSearchParams();
   const from = document.getElementById('filter-from').value;
   const to = document.getElementById('filter-to').value;
   let user = getAdvancedFilterUserId();
   if (opts.userId !== undefined) user = opts.userId;
   const sede = document.getElementById('filter-sede').value;
   const device = document.getElementById('filter-device').value;
-  let q = '';
-  if (from) q += `date_from=${from}&`;
-  if (to) q += `date_to=${to}&`;
-  if (user) q += `user_id=${encodeURIComponent(user)}&`;
-  if (sede) q += `sede_id=${sede}&`;
-  if (device) q += `device_id=${device}&`;
+  if (from) params.set('date_from', from);
+  if (to) params.set('date_to', to);
+  if (user) params.set('user_id', user);
+  if (sede) params.set('sede_id', sede);
+  if (device) params.set('device_id', device);
   if (attendanceMode !== 'advanced') {
     const sourceMode = document.getElementById('easy-source-mode')?.value || 'device';
-    q += `source_mode=${encodeURIComponent(sourceMode)}&`;
+    params.set('source_mode', sourceMode);
   }
-  return q;
+  return params.toString();
 }
 
 let attendanceMode = localStorage.getItem('sca-attendance-mode') || 'easy';
@@ -4117,27 +4162,28 @@ async function loadReport(filterOpts = {}) {
 }
 
 function exportCSV() {
-  window.open('/api/attendance/export/csv?' + getFilterQuery(), '_blank');
+  const q = getFilterQuery();
+  downloadAuthenticated('/api/attendance/export/csv?' + q, 'asistencia.csv').catch(e => toast(e.message, 'error'));
 }
 
 function exportTardinessXLSX(filterOpts = {}) {
   const hasOpts = filterOpts && Object.keys(filterOpts).length;
   const q = hasOpts ? getFilterQuery(filterOpts) : getFilterQuery();
-  window.open('/api/reports/tardiness/export/xlsx?' + q, '_blank');
-  toast('Descargando Excel de tardanzas por empleado...');
+  downloadAuthenticated('/api/reports/tardiness/export/xlsx?' + q, 'tardanzas.xlsx').catch(e => toast(e.message, 'error'));
 }
 
 function exportTardinessCSV(format = 'person') {
-  const q = getFilterQuery();
-  const sep = q ? '&' : '';
-  window.open(`/api/reports/tardiness/export/csv?${q}${sep}format=${format}`, '_blank');
-  toast(format === 'detail' ? 'Descargando CSV detalle diario...' : 'Descargando CSV por empleado...');
+  const params = new URLSearchParams(getFilterQuery());
+  params.set('format', format);
+  downloadAuthenticated('/api/reports/tardiness/export/csv?' + params.toString(), 'tardanzas.csv')
+    .catch(e => toast(e.message, 'error'));
 }
 
 function exportXLSX(format = 'person', filterOpts = {}) {
-  const q = getFilterQuery(filterOpts);
-  window.open(`/api/attendance/export/xlsx?${q}format=${format}`, '_blank');
-  toast(format === 'person' ? 'Descargando Excel por persona...' : 'Descargando Excel por sede...');
+  const params = new URLSearchParams(getFilterQuery(filterOpts));
+  params.set('format', format);
+  downloadAuthenticated('/api/attendance/export/xlsx?' + params.toString(), 'asistencia.xlsx')
+    .catch(e => toast(e.message, 'error'));
 }
 
 let allUsersList = [];
@@ -4349,8 +4395,8 @@ async function loadOfflineDownloads() {
 }
 
 function exportOfflineDownload(id) {
-  window.open(`/api/offline/downloads/${id}/export`, '_blank');
-  toast('Descargando ZIP guardado...');
+  downloadAuthenticated(`/api/offline/downloads/${id}/export`, `descarga_${id}.zip`)
+    .catch(e => toast(e.message, 'error'));
 }
 
 async function deleteOfflineDownload(id) {
