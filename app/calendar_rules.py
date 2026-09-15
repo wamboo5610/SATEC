@@ -30,13 +30,16 @@ PERU_HOLIDAYS_2026 = [
     ("2026-04-02", "Jueves Santo"),
     ("2026-04-03", "Viernes Santo"),
     ("2026-05-01", "Día del Trabajo"),
+    ("2026-06-07", "Día de la Bandera"),
     ("2026-06-29", "San Pedro y San Pablo"),
     ("2026-07-28", "Fiestas Patrias"),
     ("2026-07-29", "Fiestas Patrias"),
+    ("2026-08-06", "Batalla de Junín"),
     ("2026-08-30", "Santa Rosa de Lima"),
     ("2026-10-08", "Combate de Angamos"),
     ("2026-11-01", "Todos los Santos"),
     ("2026-12-08", "Inmaculada Concepción"),
+    ("2026-12-09", "Batalla de Ayacucho"),
     ("2026-12-25", "Navidad"),
 ]
 
@@ -50,14 +53,26 @@ def merge_work_days(schedule: dict | None) -> dict:
     return merged
 
 
-def classify_day(date_str: str, schedule: dict | None, holiday_dates: set[str] | None = None) -> dict:
+def classify_day(
+    date_str: str,
+    schedule: dict | None,
+    holiday_dates: set[str] | None = None,
+    holiday_names: dict[str, str] | None = None,
+) -> dict:
     """Clasifica un día: laborable, fin de semana o feriado."""
     holiday_dates = holiday_dates or set()
+    holiday_names = holiday_names or {}
     if not date_str:
         return {"laborable": False, "tipo_dia": "sin_fecha", "etiqueta": "Sin fecha"}
 
     if date_str in holiday_dates:
-        return {"laborable": False, "tipo_dia": "feriado", "etiqueta": "Feriado"}
+        name = holiday_names.get(date_str) or "Feriado"
+        return {
+            "laborable": False,
+            "tipo_dia": "feriado",
+            "etiqueta": f"Feriado · {name}",
+            "holiday_name": name,
+        }
 
     try:
         weekday = datetime.strptime(date_str[:10], "%Y-%m-%d").weekday()

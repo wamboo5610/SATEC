@@ -942,6 +942,21 @@ def _tardiness_export_data(date_from, date_to, user_id, sede_id, device_id, sour
 XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
+def _safe_filename(text: str) -> str:
+    cleaned = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in str(text or ""))
+    return cleaned.strip("_")[:40] or "satec"
+
+
+def tardiness_export_name(prefix: str, year: int, month: int, user_id=None, sede_id=None, ext="xlsx") -> str:
+    stamp = f"{year}_{month:02d}"
+    if user_id:
+        return f"{prefix}_dni_{_safe_filename(user_id)}_{stamp}.{ext}"
+    if sede_id:
+        names = {s["id"]: s["name"] for s in db.get_sedes()}
+        return f"{prefix}_sede_{_safe_filename(names.get(sede_id) or sede_id)}_{stamp}.{ext}"
+    return f"{prefix}_{stamp}.{ext}"
+
+
 def _as_bytes(buf) -> bytes:
     if isinstance(buf, (bytes, bytearray)):
         return bytes(buf)
@@ -1022,7 +1037,7 @@ def export_save(data: ExportSaveRequest, request: Request):
         meta["month_label"] = report.get("month_label", "")
         return send_or_save(
             rep.build_excel_monthly_tardiness(report, meta),
-            f"tardanzas_mensual_{y}_{m:02d}_{datetime.now().strftime('%H%M')}.xlsx",
+            tardiness_export_name("tardanzas", y, m, data.user_id, data.sede_id, "xlsx"),
             XLSX_MEDIA,
             dest,
         )
@@ -1041,7 +1056,7 @@ def export_save(data: ExportSaveRequest, request: Request):
         writer.writerows(rows)
         return send_or_save(
             output.getvalue(),
-            f"tardanzas_mensual_{y}_{m:02d}_{datetime.now().strftime('%H%M')}.csv",
+            tardiness_export_name("tardanzas", y, m, data.user_id, data.sede_id, "csv"),
             "text/csv; charset=utf-8",
             dest,
         )
@@ -1182,7 +1197,7 @@ def export_monthly_tardiness_xlsx(
     meta = _export_meta(data["date_from"], data["date_to"], sede_id, device_id)
     meta["month_label"] = data.get("month_label", "")
     buf = rep.build_excel_monthly_tardiness(data, meta)
-    fname = f"tardanzas_mensual_{y}_{m:02d}_{datetime.now().strftime('%H%M')}.xlsx"
+    fname = tardiness_export_name("tardanzas", y, m, user_id, sede_id, "xlsx")
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1211,7 +1226,7 @@ def export_monthly_tardiness_csv(
     writer.writerow(headers)
     writer.writerows(rows)
     output.seek(0)
-    fname = f"tardanzas_mensual_{y}_{m:02d}_{datetime.now().strftime('%H%M')}.csv"
+    fname = tardiness_export_name("tardanzas", y, m, user_id, sede_id, "csv")
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
@@ -1484,11 +1499,73 @@ def list_users(device_serial: str | None = None, sede_id: int | None = None):
     for u in users:
         row = dict(u)
         dev = device_map.get(row.get("device_serial") or "", {})
-        row["sede_name"] = dev.get("sede_name", "Sin sede")
-        row["sede_id"] = dev.get("sede_id")
+        row["sede_name"] = row.get("profile_sede_name") or dev.get("sede_name", "Sin sede")
+        row["sede_id"] = row.get("profile_sede_id") or dev.get("sede_id")
         row["device_name"] = dev.get("device_name", row.get("device_serial") or "—")
+        row["dni"] = row.get("dni") or row.get("user_id")
         enriched.append(row)
     return enriched
+
+
+class UserProfileUpdate(BaseModel):
+    dni: str | None = None
+    display_name: str | None = None
+    sede_id: int | None = None
+
+
+class AbsenceCreate(BaseModel):
+    date_from: str
+    date_to: str
+    kind: str = "permiso"
+    reason: str | None = None
+
+
+class TardinessSettingsUpdate(BaseModel):
+    tolerance_enabled: bool = False
+    tolerance_minutes: int = 20
+
+
+@app.patch("/api/users/{user_id}")
+def update_user_profile(user_id: str, data: UserProfileUpdate):
+    saved = db.save_employee_profile(
+        user_id,
+        dni=data.dni,
+        display_name=data.display_name,
+        sede_id=data.sede_id,
+    )
+    return {"message": "Datos actualizados", "profile": saved}
+
+
+@app.get("/api/users/{user_id}/absences")
+def list_user_absences(user_id: str):
+    return db.get_employee_absences(user_id)
+
+
+@app.post("/api/users/{user_id}/absences")
+def create_user_absence(user_id: str, data: AbsenceCreate):
+    if not data.date_from or not data.date_to:
+        raise HTTPException(400, "Indique el rango de fechas")
+    absence_id = db.save_employee_absence(user_id, data.date_from, data.date_to, data.kind, data.reason)
+    return {"message": "Justificación registrada", "id": absence_id, "absences": db.get_employee_absences(user_id)}
+
+
+@app.delete("/api/absences/{absence_id}")
+def remove_absence(absence_id: int):
+    db.delete_employee_absence(absence_id)
+    return {"message": "Justificación eliminada"}
+
+
+@app.get("/api/tardiness/settings")
+def tardiness_settings():
+    return db.get_tardiness_settings()
+
+
+@app.put("/api/tardiness/settings")
+def update_tardiness_settings(data: TardinessSettingsUpdate):
+    return db.set_tardiness_settings(
+        tolerance_enabled=data.tolerance_enabled,
+        tolerance_minutes=data.tolerance_minutes,
+    )
 
 
 @app.post("/api/offline/download")

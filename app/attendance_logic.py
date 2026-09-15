@@ -408,8 +408,13 @@ def normalize_schedule(schedule: dict | None) -> dict:
     return base
 
 
-def is_laborable_day(date_str: str, work_day_schedule: dict | None, holiday_dates: set[str] | None) -> dict:
-    return classify_day(date_str, work_day_schedule, holiday_dates)
+def is_laborable_day(
+    date_str: str,
+    work_day_schedule: dict | None,
+    holiday_dates: set[str] | None,
+    holiday_names: dict[str, str] | None = None,
+) -> dict:
+    return classify_day(date_str, work_day_schedule, holiday_dates, holiday_names)
 
 
 def resolve_expected_slots(marcaciones: list[dict], schedule: dict | None = None) -> dict[str, str | None]:
@@ -592,7 +597,9 @@ def enrich_with_schedule(
     *,
     work_day_schedule: dict | None = None,
     holiday_dates: set[str] | None = None,
+    holiday_names: dict[str, str] | None = None,
     remedies_lookup: dict | None = None,
+    absence: dict | None = None,
 ) -> dict:
     """Calcula tardanza de entrada y regreso de almuerzo según horario de la sede."""
     result = dict(person)
@@ -620,9 +627,17 @@ def enrich_with_schedule(
         "dia_laborable": False,
     }
 
-    day_info = is_laborable_day(date, work_sched, holiday_dates)
+    if absence:
+        kind = (absence.get("kind") or "permiso").replace("_", " ").title()
+        reason = absence.get("reason") or ""
+        etiqueta = f"{kind}" + (f" · {reason}" if reason else "")
+        day_info = {"laborable": False, "tipo_dia": "justificado", "etiqueta": etiqueta}
+    else:
+        day_info = is_laborable_day(date, work_sched, holiday_dates, holiday_names)
     result["tipo_dia"] = day_info["tipo_dia"]
     result["dia_laborable"] = day_info["laborable"]
+    result["holiday_name"] = day_info.get("holiday_name")
+    result["justificacion"] = absence
 
     if date and not day_info["laborable"]:
         non_work = dict(empty)
@@ -718,6 +733,8 @@ def build_daily_summary(
     global_holidays: set[str] | None = None,
     holidays_by_sede: dict | None = None,
     remedies_lookup: dict | None = None,
+    holiday_names: dict[str, str] | None = None,
+    absences_lookup: dict | None = None,
 ) -> list[dict]:
     """Resumen diario con entrada, salida, almuerzo y minutos de tardanza."""
     inferred = infer_punch_types(rows)
@@ -814,12 +831,18 @@ def build_daily_summary(
         holiday_dates = set(global_holidays)
         if sede_id is not None:
             holiday_dates |= holidays_by_sede.get(sede_id, set())
+        date = person.get("work_date")
+        absence = None
+        if absences_lookup and date:
+            absence = absences_lookup.get((str(person["user_id"]), date))
         row = enrich_with_schedule(
             person,
             schedule,
             work_day_schedule=sede_schedule or schedule,
             holiday_dates=holiday_dates,
+            holiday_names=holiday_names,
             remedies_lookup=remedies_lookup,
+            absence=absence,
         )
         row["horario_aplicado"] = "rotativo" if extra_shifts_of(schedule) else horario_tipo
         summary.append(row)
@@ -834,6 +857,8 @@ def build_tardiness_report(
     global_holidays: set[str] | None = None,
     holidays_by_sede: dict | None = None,
     remedies_lookup: dict | None = None,
+    holiday_names: dict[str, str] | None = None,
+    absences_lookup: dict | None = None,
 ) -> list[dict]:
     """Agrupa marcaciones por empleado y día, calculando tardanzas del período."""
     inferred = infer_punch_types(rows)
@@ -858,6 +883,8 @@ def build_tardiness_report(
             global_holidays,
             holidays_by_sede,
             remedies_lookup,
+            holiday_names,
+            absences_lookup,
         )
         person = next((p for p in mini_summary if p["user_id"] == uid), None)
         if not person:
@@ -878,8 +905,11 @@ def build_tardiness_report(
             "hora_esperada": person.get("hora_esperada"),
             "hora_almuerzo_fin": person.get("hora_almuerzo_fin"),
             "horario_aplicado": person.get("horario_aplicado", "sede"),
+            "horario_turno": person.get("horario_turno"),
             "tipo_dia": person.get("tipo_dia"),
             "dia_laborable": person.get("dia_laborable", True),
+            "holiday_name": person.get("holiday_name"),
+            "justificacion": person.get("justificacion"),
             "total_marcaciones": person.get("total_marcaciones", 0),
             "marcaciones_esperadas": person.get("marcaciones_esperadas", 0),
             "marcaciones_faltantes": person.get("marcaciones_faltantes", []),
@@ -893,7 +923,12 @@ def build_tardiness_report(
     return report
 
 
-def aggregate_tardiness_report(report: list[dict]) -> dict:
+def aggregate_tardiness_report(
+    report: list[dict],
+    *,
+    apply_tolerance: bool = False,
+    tolerance_minutes: int = MONTHLY_TOLERANCE_MINUTES,
+) -> dict:
     """Agrega estadísticas de tardanza; excluye feriados y días no laborables."""
     laborable = [r for r in report if r.get("dia_laborable", True)]
 
@@ -938,7 +973,10 @@ def aggregate_tardiness_report(report: list[dict]) -> dict:
     total_tolerance_applied = 0
     for k, v in by_person.items():
         gross = v["late_minutes"]
-        net, applied = apply_monthly_tolerance(gross)
+        if apply_tolerance:
+            net, applied = apply_monthly_tolerance(gross, tolerance_minutes)
+        else:
+            net, applied = gross, 0
         total_late_minutes_gross += gross
         total_late_minutes_net += net
         total_tolerance_applied += applied
@@ -968,7 +1006,8 @@ def aggregate_tardiness_report(report: list[dict]) -> dict:
         "total_late_minutes_gross": total_late_minutes_gross,
         "total_tolerance_applied": total_tolerance_applied,
         "total_late_minutes": total_late_minutes_net,
-        "monthly_tolerance_minutes": MONTHLY_TOLERANCE_MINUTES,
+        "monthly_tolerance_minutes": tolerance_minutes if apply_tolerance else 0,
+        "tolerance_enabled": bool(apply_tolerance),
         "total_persons": len(by_person_list),
         "persons_with_late": sum(1 for p in by_person_list if p["late_minutes"] > 0),
         "non_work_days": len(report) - len(laborable),

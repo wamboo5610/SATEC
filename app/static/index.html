@@ -108,6 +108,8 @@
     .tard-day.ok { background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.28); }
     .tard-day.late { background:rgba(245,158,11,.16); border-color:rgba(245,158,11,.35); }
     .tard-day.heavy { background:rgba(239,68,68,.14); border-color:rgba(239,68,68,.35); }
+    .tard-day.holiday { background:rgba(99,102,241,.14); border-color:rgba(99,102,241,.4); }
+    .tard-day.justified { background:rgba(14,165,233,.14); border-color:rgba(14,165,233,.4); }
     .tard-day.selected { outline:2px solid var(--accent); }
     @media(max-width:980px){ .tard-layout { grid-template-columns:1fr; } }
     .device-actions { display:flex; gap:6px; flex-wrap:wrap; }
@@ -974,6 +976,10 @@
             <label>Persona</label>
             <input id="tard-person-q" placeholder="ID o nombre..." oninput="filterTardinessPeople()" autocomplete="off">
           </div>
+          <label class="chk-label" style="margin:0">
+            <input type="checkbox" id="tard-tolerance" onchange="saveTardinessTolerance()">
+            Tolerancia 20 min
+          </label>
           <button class="btn btn-outline btn-sm" type="button" onclick="loadTardinessCalendar()">🔄 Actualizar</button>
           <button class="btn btn-success btn-sm" type="button" onclick="exportTardinessCalendar()">📊 Excel</button>
         </div>
@@ -1004,7 +1010,7 @@
         <h3 id="tard-day-title">Detalle del día</h3>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>ID</th><th>Nombre</th><th>Sede</th><th>Entrada</th><th>Esperada</th><th>Min. entrada</th><th>Min. almuerzo</th><th>Total</th><th>Estado</th></tr></thead>
+            <thead><tr><th>ID</th><th>Nombre</th><th>Sede</th><th>Entrada mañana</th><th>Salida mañana</th><th>Entrada tarde</th><th>Salida tarde</th><th>Min.</th><th>Estado</th></tr></thead>
             <tbody id="tard-day-body"></tbody>
           </table>
         </div>
@@ -1027,7 +1033,7 @@
         entrada mañana <strong>05:00–09:00</strong> · salida mañana <strong>12:00–14:00</strong> ·
         entrada tarde <strong>14:01–15:00</strong> (hora esperada <strong>14:30</strong>, tardanza después de las 14:30) · salida tarde <strong>17:00–23:59</strong>.
         <br><br>
-        <strong>Tolerancia RRHH:</strong> cada empleado tiene <strong>20 minutos mensuales</strong> que se restan del total acumulado de tardanza del período (no por marcación).
+        La tolerancia mensual de 20 minutos es <strong>opcional</strong> y se activa en el módulo Tardanzas.
       </div>
       <div class="card">
         <h3>Seleccionar sede</h3>
@@ -1206,8 +1212,8 @@
         </div>
         <div class="table-wrap" id="users-table-wrap">
           <table>
-            <thead><tr><th></th><th>ID</th><th>Nombre</th><th>Sede</th><th>Reloj</th><th>Horario</th><th>Acciones</th></tr></thead>
-            <tbody id="users-tbody"><tr><td colspan="7" class="empty">Sincroniza un dispositivo o usa Descarga Local.</td></tr></tbody>
+            <thead><tr><th></th><th>ID</th><th>DNI</th><th>Nombre</th><th>Sede / lugar</th><th>Reloj</th><th>Horario</th><th>Acciones</th></tr></thead>
+            <tbody id="users-tbody"><tr><td colspan="8" class="empty">Sincroniza un dispositivo o usa Descarga Local.</td></tr></tbody>
           </table>
         </div>
         <div id="users-by-sede" style="display:none"></div>
@@ -1388,6 +1394,47 @@
       <button class="btn btn-outline btn-sm" type="button" onclick="closeEmployeeScheduleModal()">Cancelar</button>
       <button class="btn btn-primary btn-sm" type="button" onclick="saveEmployeeSchedule()">Guardar horario</button>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="employee-profile-modal">
+  <div class="modal-card">
+    <h3>Actualizar datos</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px" id="emp-prof-subtitle">—</p>
+    <div class="form-group"><label>DNI</label><input id="emp-prof-dni" placeholder="Documento"></div>
+    <div class="form-group"><label>Nombres</label><input id="emp-prof-name" placeholder="Apellidos y nombres"></div>
+    <div class="form-group"><label>Lugar de marcación (sede)</label><select id="emp-prof-sede"></select></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" type="button" onclick="closeEmployeeProfileModal()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" type="button" onclick="saveEmployeeProfile()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="employee-absence-modal">
+  <div class="modal-card wide">
+    <h3>Justificación / permiso</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:14px" id="emp-abs-subtitle">—</p>
+    <div class="grid-2">
+      <div class="form-group"><label>Desde</label><input type="date" id="emp-abs-from"></div>
+      <div class="form-group"><label>Hasta</label><input type="date" id="emp-abs-to"></div>
+      <div class="form-group">
+        <label>Tipo</label>
+        <select id="emp-abs-kind">
+          <option value="permiso">Permiso</option>
+          <option value="vacaciones">Vacaciones</option>
+          <option value="comision">Comisión de servicio</option>
+          <option value="licencia">Licencia</option>
+          <option value="descanso_medico">Descanso médico</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Motivo</label><input id="emp-abs-reason" placeholder="Ej: Permiso particular 03 al 05 de agosto"></div>
+    </div>
+    <div class="modal-actions" style="margin-bottom:12px">
+      <button class="btn btn-outline btn-sm" type="button" onclick="closeAbsenceModal()">Cerrar</button>
+      <button class="btn btn-primary btn-sm" type="button" onclick="saveAbsence()">Registrar</button>
+    </div>
+    <div id="emp-abs-list" class="empty">Sin justificaciones</div>
   </div>
 </div>
 
@@ -2741,6 +2788,8 @@ function renderTardinessPeople(persons) {
 }
 
 function tardinessDayClass(day, person) {
+  if (day.holiday) return 'holiday';
+  if (day.justified && (!person || String(tardinessPersonId))) return 'justified';
   const mins = person ? (person.days || {})[day.date] || 0 : (day.late_minutes || 0);
   if (mins >= 30) return 'heavy';
   if (mins > 0) return 'late';
@@ -2761,11 +2810,15 @@ function renderTardinessCalendar() {
     const people = person ? (mins ? 1 : 0) : day.late_persons || 0;
     const selected = tardinessDay === day.date ? 'selected' : '';
     const klass = tardinessDayClass(day, person);
+    let label = `${mins}`;
+    let sub = people ? people + ' pers.' : '—';
+    if (day.holiday) { label = 'Feriado'; sub = day.holiday_name || 'Feriado'; }
+    else if (day.justified && person) { label = 'Permiso'; sub = 'Justificado'; }
     cells.push(`
       <button type="button" class="tard-day ${klass} ${selected}" onclick="selectTardinessDay('${day.date}')">
         <div class="n">${day.day}</div>
-        <div class="m">${mins}</div>
-        <div class="p">${people ? people + ' pers.' : '—'}</div>
+        <div class="m">${label}</div>
+        <div class="p">${sub}</div>
       </button>`);
   }
   el.innerHTML = heads.map(h => `<div class="tard-cal-head">${h}</div>`).join('') + cells.join('');
@@ -2783,7 +2836,8 @@ function renderTardinessDayDetail() {
   if (!day) { card.style.display = 'none'; return; }
   let rows = day.details || [];
   if (tardinessPersonId) rows = rows.filter(r => String(r.user_id) === String(tardinessPersonId));
-  title.textContent = `${tardinessDay} · ${day.late_minutes || 0} min · ${rows.length} registro(s)`;
+  const extra = day.holiday ? ` · Feriado ${day.holiday_name || ''}` : (day.justified ? ' · Justificado' : '');
+  title.textContent = `${tardinessDay} · ${day.late_minutes || 0} min · ${rows.length} registro(s)${extra}`;
   card.style.display = 'block';
   body.innerHTML = rows.map(d => `
     <tr>
@@ -2791,12 +2845,12 @@ function renderTardinessDayDetail() {
       <td>${d.user_name || '—'}</td>
       <td>${d.sede_name || '—'}</td>
       <td>${formatTime(d.entrada)}</td>
-      <td>${d.hora_esperada || '—'}</td>
-      <td>${d.tardanza_minutos || 0}</td>
-      <td>${d.tardanza_almuerzo_minutos || 0}</td>
+      <td>${formatTime(d.salida_almuerzo)}</td>
+      <td>${formatTime(d.entrada_almuerzo)}</td>
+      <td>${formatTime(d.salida)}</td>
       <td><strong>${d.tardanza_total_minutos || 0}</strong></td>
-      <td>${d.estado_asistencia || '—'}</td>
-    </tr>`).join('') || '<tr><td colspan="9" class="empty">Sin tardanzas este día.</td></tr>';
+      <td>${d.estado_asistencia || '—'}${d.holiday_name ? ' · ' + d.holiday_name : ''}${d.justificacion ? ' · ' + (d.justificacion.kind || 'permiso') : ''}</td>
+    </tr>`).join('') || `<tr><td colspan="9" class="empty">${day.holiday ? ('Feriado: ' + (day.holiday_name || '')) : 'Sin registros este día.'}</td></tr>`;
 }
 
 function selectTardinessPerson(userId) {
@@ -2840,6 +2894,9 @@ async function loadTardinessCalendar() {
       if (cur) sedeSel.value = cur;
     }
     tardinessData = await api('/api/tardiness/calendar?' + tardinessQuery().toString());
+    const settings = tardinessData.settings || {};
+    const tol = document.getElementById('tard-tolerance');
+    if (tol) tol.checked = !!settings.tolerance_enabled;
     const t = tardinessData.totals || {};
     document.getElementById('tard-kpi-persons').textContent = t.persons ?? 0;
     document.getElementById('tard-kpi-minutes').textContent = t.late_minutes ?? 0;
@@ -2857,8 +2914,26 @@ async function loadTardinessCalendar() {
 
 function exportTardinessCalendar() {
   const q = tardinessQuery();
-  downloadAuthenticated('/api/reports/tardiness/monthly/export/xlsx?' + q.toString(), 'tardanzas_mes.xlsx')
+  const monthVal = document.getElementById('tard-month')?.value || '';
+  const sedeSel = document.getElementById('tard-sede');
+  const sedeName = sedeSel?.selectedOptions?.[0]?.text || '';
+  let fname = `tardanzas_${monthVal || 'mes'}.xlsx`;
+  if (tardinessPersonId) fname = `tardanzas_dni_${tardinessPersonId}_${monthVal}.xlsx`;
+  else if (sedeSel?.value) fname = `tardanzas_sede_${(sedeName || 'sede').replace(/\s+/g, '_')}_${monthVal}.xlsx`;
+  downloadAuthenticated('/api/reports/tardiness/monthly/export/xlsx?' + q.toString(), fname)
     .catch(e => toast(e.message, 'error'));
+}
+
+async function saveTardinessTolerance() {
+  const enabled = !!document.getElementById('tard-tolerance')?.checked;
+  try {
+    await api('/api/tardiness/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ tolerance_enabled: enabled, tolerance_minutes: 20 }),
+    });
+    toast(enabled ? 'Tolerancia de 20 min activada' : 'Tolerancia desactivada');
+    loadTardinessCalendar();
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 async function processExcelTardiness() {
@@ -4324,6 +4399,108 @@ function userHorarioBadge(userId) {
   return `<span class="badge badge-orange">${custom.entry_time}–${custom.exit_time}</span>`;
 }
 
+let employeeProfileEditing = null;
+let employeeAbsenceEditing = null;
+
+async function openEmployeeProfileModal(userId, name, dni, sedeId) {
+  employeeProfileEditing = String(userId);
+  document.getElementById('emp-prof-subtitle').textContent = `${name || userId} · ID ${userId}`;
+  document.getElementById('emp-prof-dni').value = dni || userId;
+  document.getElementById('emp-prof-name').value = name || '';
+  try {
+    const sedes = await api('/api/sedes');
+    document.getElementById('emp-prof-sede').innerHTML = '<option value="">Sin sede</option>' +
+      sedes.map(s => `<option value="${s.id}" ${String(s.id)===String(sedeId)?'selected':''}>${s.name}</option>`).join('');
+  } catch (e) { /* ignore */ }
+  document.getElementById('employee-profile-modal').classList.add('open');
+}
+
+function closeEmployeeProfileModal() {
+  document.getElementById('employee-profile-modal').classList.remove('open');
+  employeeProfileEditing = null;
+}
+
+async function saveEmployeeProfile() {
+  if (!employeeProfileEditing) return;
+  try {
+    const sedeVal = document.getElementById('emp-prof-sede').value;
+    await api(`/api/users/${encodeURIComponent(employeeProfileEditing)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        dni: document.getElementById('emp-prof-dni').value.trim() || null,
+        display_name: document.getElementById('emp-prof-name').value.trim() || null,
+        sede_id: sedeVal ? +sedeVal : null,
+      }),
+    });
+    toast('Datos actualizados');
+    closeEmployeeProfileModal();
+    loadUsers();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function openAbsenceModal(userId, name) {
+  employeeAbsenceEditing = String(userId);
+  document.getElementById('emp-abs-subtitle').textContent = `${name || userId} · ID ${userId}`;
+  document.getElementById('emp-abs-from').value = '';
+  document.getElementById('emp-abs-to').value = '';
+  document.getElementById('emp-abs-reason').value = '';
+  document.getElementById('employee-absence-modal').classList.add('open');
+  await refreshAbsenceList();
+}
+
+function closeAbsenceModal() {
+  document.getElementById('employee-absence-modal').classList.remove('open');
+  employeeAbsenceEditing = null;
+}
+
+async function refreshAbsenceList() {
+  const el = document.getElementById('emp-abs-list');
+  if (!employeeAbsenceEditing || !el) return;
+  try {
+    const rows = await api(`/api/users/${encodeURIComponent(employeeAbsenceEditing)}/absences`);
+    if (!rows.length) { el.innerHTML = '<div class="empty">Sin justificaciones registradas.</div>'; return; }
+    el.innerHTML = rows.map(r => `
+      <div class="device-card" style="margin-bottom:8px">
+        <div class="info">
+          <h4>${r.kind || 'permiso'} · ${r.date_from} a ${r.date_to}</h4>
+          <p>${r.reason || '—'}</p>
+        </div>
+        <button class="btn btn-outline btn-sm" type="button" onclick="deleteAbsence(${r.id})">Eliminar</button>
+      </div>`).join('');
+  } catch (e) { el.innerHTML = `<div class="empty">${e.message}</div>`; }
+}
+
+async function saveAbsence() {
+  if (!employeeAbsenceEditing) return;
+  const dateFrom = document.getElementById('emp-abs-from').value;
+  const dateTo = document.getElementById('emp-abs-to').value || dateFrom;
+  if (!dateFrom) return toast('Indique la fecha de inicio', 'error');
+  try {
+    await api(`/api/users/${encodeURIComponent(employeeAbsenceEditing)}/absences`, {
+      method: 'POST',
+      body: JSON.stringify({
+        date_from: dateFrom,
+        date_to: dateTo,
+        kind: document.getElementById('emp-abs-kind').value,
+        reason: document.getElementById('emp-abs-reason').value.trim() || null,
+      }),
+    });
+    toast('Justificación registrada');
+    document.getElementById('emp-abs-reason').value = '';
+    await refreshAbsenceList();
+    loadUsers();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function deleteAbsence(id) {
+  if (!confirm('¿Eliminar esta justificación?')) return;
+  try {
+    await api(`/api/absences/${id}`, { method: 'DELETE' });
+    toast('Justificación eliminada');
+    await refreshAbsenceList();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
 async function importRolTurnos(input) {
   const file = input?.files?.[0];
   if (!file) return;
@@ -4347,11 +4524,16 @@ function userRowHtml(u) {
   return `<tr>
     <td><input type="checkbox" class="user-check" value="${u.user_id}" data-sede="${u.sede_id || ''}" onchange="updateUsersSelectedCount()"></td>
     <td><strong>${u.user_id}</strong></td>
+    <td>${u.dni || u.user_id}</td>
     <td>${u.name || '—'}</td>
     <td><span class="badge badge-blue">${u.sede_name || 'Sin sede'}</span></td>
     <td style="font-size:12px;color:var(--muted)">${u.device_name || '—'}</td>
     <td>${userHorarioBadge(u.user_id)}</td>
-    <td><button class="btn btn-outline btn-sm" onclick="openEmployeeScheduleModal('${u.user_id}', '${safeName}')">⏰ Gestionar horario</button></td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick='openEmployeeProfileModal(${JSON.stringify(u.user_id)}, ${JSON.stringify(u.name || "")}, ${JSON.stringify(u.dni || u.user_id)}, ${JSON.stringify(u.sede_id || "")})'>Datos</button>
+      <button class="btn btn-outline btn-sm" onclick='openAbsenceModal(${JSON.stringify(u.user_id)}, ${JSON.stringify(u.name || "")})'>Permiso</button>
+      <button class="btn btn-outline btn-sm" onclick="openEmployeeScheduleModal('${u.user_id}', '${safeName}')">Horario</button>
+    </td>
   </tr>`;
 }
 
@@ -4426,7 +4608,7 @@ function renderUsersTable(list) {
   if (!list.length) {
     const q = document.getElementById('users-search')?.value?.trim();
     const sede = document.getElementById('users-sede')?.value;
-    tbody.innerHTML = `<tr><td colspan="7" class="empty">${q || sede ? 'Ningún empleado coincide con el filtro.' : 'Sin empleados. Usa Descarga Local o sincroniza un reloj.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty">${q || sede ? 'Ningún empleado coincide con el filtro.' : 'Sin empleados. Usa Descarga Local o sincroniza un reloj.'}</td></tr>`;
     if (countEl) countEl.textContent = q || sede ? '0 resultados' : '';
     updateUsersSelectedCount();
     return;
@@ -4504,7 +4686,7 @@ async function loadUsers() {
     });
     filterUsers();
   } catch (e) {
-    document.getElementById('users-tbody').innerHTML = `<tr><td colspan="7">${e.message}</td></tr>`;
+    document.getElementById('users-tbody').innerHTML = `<tr><td colspan="8">${e.message}</td></tr>`;
   }
 }
 

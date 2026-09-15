@@ -301,6 +301,38 @@ def _migrate(conn):
                 "INSERT OR IGNORE INTO holidays (holiday_date, name, sede_id) VALUES (?, ?, NULL)",
                 (d, name),
             )
+    if not conn.execute("SELECT 1 FROM meta WHERE key='peru_holidays_2026_v2'").fetchone():
+        from .calendar_rules import PERU_HOLIDAYS_2026
+        for d, name in PERU_HOLIDAYS_2026:
+            conn.execute(
+                "INSERT OR IGNORE INTO holidays (holiday_date, name, sede_id) VALUES (?, ?, NULL)",
+                (d, name),
+            )
+        conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('peru_holidays_2026_v2', '1')")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS employee_profiles (
+            user_id TEXT PRIMARY KEY,
+            dni TEXT,
+            display_name TEXT,
+            sede_id INTEGER,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS employee_absences (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            date_from TEXT NOT NULL,
+            date_to TEXT NOT NULL,
+            kind TEXT NOT NULL DEFAULT 'permiso',
+            reason TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    if not conn.execute("SELECT 1 FROM meta WHERE key='tardiness_tolerance_enabled'").fetchone():
+        conn.execute("INSERT INTO meta (key, value) VALUES ('tardiness_tolerance_enabled', '0')")
+        conn.execute("INSERT OR IGNORE INTO meta (key, value) VALUES ('tardiness_tolerance_minutes', '20')")
 
     if "offline_downloads" not in tables:
         conn.execute("""
@@ -727,7 +759,21 @@ def get_users(device_serial=None, sede_id=None):
             rows = conn.execute("SELECT * FROM users_cache WHERE device_serial=?", (device_serial,)).fetchall()
         else:
             rows = conn.execute("SELECT * FROM users_cache ORDER BY name").fetchall()
-        return [dict(r) for r in rows]
+        users = [dict(r) for r in rows]
+    profiles = get_employee_profiles_map()
+    sedes = {s["id"]: s["name"] for s in get_sedes()}
+    for user in users:
+        profile = profiles.get(str(user.get("user_id")))
+        if not profile:
+            continue
+        if profile.get("display_name"):
+            user["name"] = profile["display_name"]
+        if profile.get("dni"):
+            user["dni"] = profile["dni"]
+        if profile.get("sede_id"):
+            user["profile_sede_id"] = profile["sede_id"]
+            user["profile_sede_name"] = sedes.get(profile["sede_id"])
+    return users
 
 
 def upsert_adms_device(serial, options=None, sede_id=None, alias=None):
@@ -851,6 +897,123 @@ def get_holiday_dates_lookup():
             else:
                 by_sede.setdefault(r["sede_id"], set()).add(r["holiday_date"])
     return global_dates, by_sede
+
+
+def get_holiday_names() -> dict[str, str]:
+    names: dict[str, str] = {}
+    with get_conn() as conn:
+        for r in conn.execute(
+            "SELECT holiday_date, name, sede_id FROM holidays ORDER BY sede_id IS NOT NULL"
+        ).fetchall():
+            if r["holiday_date"] not in names or r["sede_id"] is None:
+                names[r["holiday_date"]] = r["name"]
+    return names
+
+
+def get_meta(key: str, default: str = "") -> str:
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else default
+
+
+def set_meta(key: str, value: str) -> None:
+    with get_conn() as conn:
+        conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, str(value)))
+
+
+def get_tardiness_settings() -> dict:
+    enabled = get_meta("tardiness_tolerance_enabled", "0") == "1"
+    try:
+        minutes = int(get_meta("tardiness_tolerance_minutes", "20") or 20)
+    except ValueError:
+        minutes = 20
+    return {"tolerance_enabled": enabled, "tolerance_minutes": max(0, minutes)}
+
+
+def set_tardiness_settings(*, tolerance_enabled: bool, tolerance_minutes: int = 20) -> dict:
+    set_meta("tardiness_tolerance_enabled", "1" if tolerance_enabled else "0")
+    set_meta("tardiness_tolerance_minutes", str(max(0, int(tolerance_minutes))))
+    return get_tardiness_settings()
+
+
+def get_employee_profiles_map() -> dict[str, dict]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT * FROM employee_profiles").fetchall()
+        return {str(r["user_id"]): dict(r) for r in rows}
+
+
+def save_employee_profile(user_id: str, *, dni=None, display_name=None, sede_id=None) -> dict:
+    uid = str(user_id)
+    now = datetime.now().isoformat(timespec="seconds")
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO employee_profiles (user_id, dni, display_name, sede_id, updated_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                 dni=COALESCE(excluded.dni, employee_profiles.dni),
+                 display_name=COALESCE(excluded.display_name, employee_profiles.display_name),
+                 sede_id=COALESCE(excluded.sede_id, employee_profiles.sede_id),
+                 updated_at=excluded.updated_at""",
+            (uid, (dni or "").strip() or None, (display_name or "").strip() or None, sede_id, now),
+        )
+        if display_name and display_name.strip():
+            conn.execute("UPDATE users_cache SET name=? WHERE user_id=?", (display_name.strip(), uid))
+        row = conn.execute("SELECT * FROM employee_profiles WHERE user_id=?", (uid,)).fetchone()
+        return dict(row) if row else {"user_id": uid}
+
+
+def get_employee_absences(user_id: str | None = None, date_from: str | None = None, date_to: str | None = None):
+    clauses, params = [], []
+    if user_id:
+        clauses.append("user_id=?")
+        params.append(str(user_id))
+    if date_from:
+        clauses.append("date_to >= ?")
+        params.append(date_from)
+    if date_to:
+        clauses.append("date_from <= ?")
+        params.append(date_to)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    with get_conn() as conn:
+        rows = conn.execute(
+            f"SELECT * FROM employee_absences {where} ORDER BY date_from DESC, id DESC",
+            params,
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def save_employee_absence(user_id: str, date_from: str, date_to: str, kind: str = "permiso", reason: str | None = None) -> int:
+    if date_to < date_from:
+        date_from, date_to = date_to, date_from
+    with get_conn() as conn:
+        cur = conn.execute(
+            """INSERT INTO employee_absences (user_id, date_from, date_to, kind, reason, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (str(user_id), date_from, date_to, kind or "permiso", (reason or "").strip() or None, datetime.now().isoformat(timespec="seconds")),
+        )
+        return cur.lastrowid
+
+
+def delete_employee_absence(absence_id: int) -> None:
+    with get_conn() as conn:
+        conn.execute("DELETE FROM employee_absences WHERE id=?", (absence_id,))
+
+
+def get_absences_lookup(date_from=None, date_to=None, user_id=None) -> dict[tuple[str, str], dict]:
+    from datetime import timedelta
+
+    lookup: dict[tuple[str, str], dict] = {}
+    for row in get_employee_absences(user_id, date_from, date_to):
+        try:
+            start = datetime.strptime(row["date_from"][:10], "%Y-%m-%d")
+            end = datetime.strptime(row["date_to"][:10], "%Y-%m-%d")
+        except (TypeError, ValueError):
+            continue
+        current = start
+        while current <= end:
+            lookup[(str(row["user_id"]), current.strftime("%Y-%m-%d"))] = row
+            current += timedelta(days=1)
+    return lookup
 
 
 def holidays_for_sede(sede_id, global_dates, by_sede):
@@ -1109,10 +1272,17 @@ def get_tardiness_report(
     emp_schedules = get_schedules_by_user_id()
     sede_map = get_sede_name_to_id()
     remedies = get_punch_remedies_lookup(date_from, date_to, user_id)
+    holiday_names = get_holiday_names()
+    absences = get_absences_lookup(date_from, date_to, user_id)
+    settings = get_tardiness_settings()
     report = al.build_tardiness_report(
-        enriched, schedules, sede_map, emp_schedules, global_dates, by_sede, remedies
+        enriched, schedules, sede_map, emp_schedules, global_dates, by_sede, remedies, holiday_names, absences
     )
-    return al.aggregate_tardiness_report(report)
+    return al.aggregate_tardiness_report(
+        report,
+        apply_tolerance=settings["tolerance_enabled"],
+        tolerance_minutes=settings["tolerance_minutes"],
+    )
 
 
 MONTH_NAMES_ES = (
@@ -1161,18 +1331,25 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
         details = [d for d in details if str(d.get("user_id")) in allowed]
 
     last_day = monthrange(year, month)[1]
+    holiday_names = get_holiday_names()
+    absences = get_absences_lookup(data.get("date_from"), data.get("date_to"), user_id)
     days = []
     for day in range(1, last_day + 1):
         date = f"{year:04d}-{month:02d}-{day:02d}"
-        day_rows = [d for d in details if d.get("date") == date and d.get("dia_laborable", True)]
-        late_rows = [d for d in day_rows if (d.get("tardanza_total_minutos") or 0) > 0]
+        day_rows = [d for d in details if d.get("date") == date]
+        laborable_rows = [d for d in day_rows if d.get("dia_laborable", True)]
+        late_rows = [d for d in laborable_rows if (d.get("tardanza_total_minutos") or 0) > 0]
+        just_rows = [absences[k] for k in absences if k[1] == date]
         days.append({
             "date": date,
             "day": day,
             "weekday": weekday(year, month, day),
             "late_minutes": sum(d.get("tardanza_total_minutos") or 0 for d in late_rows),
             "late_persons": len({str(d.get("user_id")) for d in late_rows}),
-            "evaluated": len(day_rows),
+            "evaluated": len(laborable_rows),
+            "holiday": date in holiday_names,
+            "holiday_name": holiday_names.get(date),
+            "justified": bool(user_id and just_rows),
             "details": [
                 {
                     "user_id": d.get("user_id"),
@@ -1182,12 +1359,18 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
                     "tardanza_minutos": d.get("tardanza_minutos") or 0,
                     "tardanza_almuerzo_minutos": d.get("tardanza_almuerzo_minutos") or 0,
                     "entrada": d.get("entrada"),
+                    "salida_almuerzo": d.get("salida_almuerzo"),
+                    "entrada_almuerzo": d.get("entrada_almuerzo"),
+                    "salida": d.get("salida"),
                     "hora_esperada": d.get("hora_esperada"),
                     "estado_asistencia": d.get("estado_asistencia"),
                     "horario_aplicado": d.get("horario_aplicado"),
                     "horario_turno": d.get("horario_turno"),
+                    "tipo_dia": d.get("tipo_dia"),
+                    "holiday_name": d.get("holiday_name"),
+                    "justificacion": d.get("justificacion"),
                 }
-                for d in sorted(late_rows, key=lambda x: -(x.get("tardanza_total_minutos") or 0))
+                for d in sorted(day_rows, key=lambda x: -(x.get("tardanza_total_minutos") or 0))
             ],
         })
 
@@ -1215,8 +1398,10 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
             "late_persons": sum(1 for p in persons if (p.get("late_minutes") or 0) > 0),
             "late_minutes": late_minutes,
             "late_days": sum(1 for d in days if d["late_minutes"] > 0),
-            "tolerance": data.get("monthly_tolerance_minutes", 20),
+            "tolerance": data.get("monthly_tolerance_minutes", 0),
+            "tolerance_enabled": data.get("tolerance_enabled", False),
         },
+        "settings": get_tardiness_settings(),
         "regimen_options": [{"id": k, "label": v} for k, v in al.REGIMEN_LABELS.items()],
         "days": days,
         "persons": persons,

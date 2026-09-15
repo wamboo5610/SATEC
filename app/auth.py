@@ -374,7 +374,7 @@ def path_module(path: str) -> str | None:
         return "offline"
     if path.startswith("/api/employee-schedules/import"):
         return None
-    if path.startswith("/api/users") or path.startswith("/api/employee-schedules"):
+    if path.startswith("/api/users") or path.startswith("/api/employee-schedules") or path.startswith("/api/absences"):
         return "employees"
     if path.startswith("/api/sedes"):
         return "sedes"
