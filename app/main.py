@@ -777,6 +777,23 @@ def excel_tardiness_local_export(data: ExcelTardinessLocalRequest):
     )
 
 
+@app.get("/api/tardiness/calendar")
+def tardiness_calendar(
+    year: int | None = None,
+    month: int | None = None,
+    sede_id: int | None = None,
+    user_id: str | None = None,
+    regimen: str | None = None,
+):
+    now = datetime.now()
+    y = year or now.year
+    m = month or now.month
+    try:
+        return db.get_tardiness_calendar(y, m, sede_id=sede_id, user_id=user_id, regimen=regimen)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 @app.get("/api/recursos/status")
 def recursos_status(
     lista_dir: str | None = None,

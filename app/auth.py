@@ -368,7 +368,7 @@ def path_module(path: str) -> str | None:
         return "attendance"
     if path.startswith("/api/excel"):
         return "excel"
-    if path.startswith("/api/recursos"):
+    if path.startswith("/api/recursos") or path.startswith("/api/tardiness"):
         return "recursos"
     if path.startswith("/api/offline"):
         return "offline"

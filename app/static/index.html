@@ -91,6 +91,25 @@
     .users-toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
     .more-hub { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
     .more-hub .mod-tile { text-align:left; min-height:140px; }
+    .tard-layout { display:grid; grid-template-columns:280px minmax(0,1fr); gap:16px; align-items:start; }
+    .tard-people { max-height:640px; overflow:auto; display:flex; flex-direction:column; gap:6px; }
+    .tard-person { border:1px solid var(--border); background:var(--surface2); border-radius:12px; padding:10px 12px; cursor:pointer; text-align:left; }
+    .tard-person.active { border-color:var(--accent); background:rgba(8,136,48,.08); }
+    .tard-person strong { display:block; font-size:13px; }
+    .tard-person span { font-size:12px; color:var(--muted); }
+    .tard-person .mins { float:right; font-weight:800; color:var(--accent); }
+    .tard-cal { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:6px; }
+    .tard-cal-head { text-align:center; font-size:11px; font-weight:700; color:var(--muted); padding:4px 0; }
+    .tard-day { min-height:78px; border-radius:12px; padding:8px; border:1px solid var(--border); background:var(--surface2); cursor:pointer; }
+    .tard-day.empty { background:transparent; border:none; cursor:default; }
+    .tard-day .n { font-size:12px; font-weight:700; }
+    .tard-day .m { font-size:18px; font-weight:800; margin-top:8px; }
+    .tard-day .p { font-size:11px; color:var(--muted); }
+    .tard-day.ok { background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.28); }
+    .tard-day.late { background:rgba(245,158,11,.16); border-color:rgba(245,158,11,.35); }
+    .tard-day.heavy { background:rgba(239,68,68,.14); border-color:rgba(239,68,68,.35); }
+    .tard-day.selected { outline:2px solid var(--accent); }
+    @media(max-width:980px){ .tard-layout { grid-template-columns:1fr; } }
     .device-actions { display:flex; gap:6px; flex-wrap:wrap; }
     .status-pill { display:flex; align-items:center; gap:6px; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:var(--accent2); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600; }
     .chart-bars { display:flex; align-items:flex-end; gap:8px; height:140px; padding:22px 4px 26px; overflow:hidden; }
@@ -924,97 +943,69 @@
       </div>
     </section>
 
-    <!-- RECURSOS RRHH -->
+    <!-- TARDANZAS -->
     <section class="page" id="page-recursos">
       <div class="page-header">
-        <h2>Tardanzas RRHH (Lista + Reportes)</h2>
-        <p>Cruza el listado de personal CAS con los reportes del reloj y calcula minutos de tardanza solo para esas personas</p>
-      </div>
-      <div class="alert alert-info">
-        <strong>Carpetas:</strong> elige la carpeta del <strong>listado RRHH</strong> y la de los <strong>reportes del reloj</strong>
-        (por defecto en <code>Downloads\recursos\lista</code> y <code>Downloads\recursos\reportes</code>).
-        Empareja por <strong>DNI</strong> y calcula tardanzas con las <strong>mismas reglas de SATEC</strong>:
-        horario por sede o personalizado (incluye turnos rotativos de serenos y jornadas de otro régimen).
-        <strong>20 min de tolerancia mensual</strong> por empleado.
-        <span id="rec-schedules-note" style="display:block;margin-top:8px"></span>
+        <h2>Tardanzas</h2>
+        <p>Calendario mensual con minutos de tardanza por día, sede, régimen o persona. Usa las marcaciones y horarios ya guardados en SATEC.</p>
       </div>
       <div class="card">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Carpeta lista (listado RRHH)</label>
-            <div class="folder-picker">
-              <select id="rec-lista-dir-select" onchange="onRecListaDirChange()"></select>
-              <button type="button" class="btn btn-outline btn-sm" onclick="browseRecFolder('lista')">📁 Examinar</button>
-            </div>
-            <input id="rec-lista-dir-custom" placeholder="Ruta personalizada de la carpeta lista" style="display:none;margin-top:8px" onchange="onRecListaDirChange()">
-            <div class="folder-path-hint" id="rec-lista-dir-hint"></div>
+        <div class="search-bar" style="margin-bottom:0">
+          <div class="form-group" style="margin:0;min-width:150px">
+            <label>Mes</label>
+            <input type="month" id="tard-month" onchange="tardinessPersonId='';loadTardinessCalendar()">
           </div>
-          <div class="form-group">
-            <label>Archivo de listado en carpeta</label>
-            <select id="rec-lista-file-select"><option value="">— Más reciente en carpeta —</option></select>
+          <div class="form-group" style="margin:0;min-width:160px">
+            <label>Sede</label>
+            <select id="tard-sede" onchange="tardinessPersonId='';loadTardinessCalendar()"><option value="">Todas</option></select>
           </div>
-          <div class="form-group">
-            <label>Carpeta reportes (reloj)</label>
-            <div class="folder-picker">
-              <select id="rec-reportes-dir-select" onchange="onRecReportesDirChange()"></select>
-              <button type="button" class="btn btn-outline btn-sm" onclick="browseRecFolder('reportes')">📁 Examinar</button>
-            </div>
-            <input id="rec-reportes-dir-custom" placeholder="Ruta personalizada de la carpeta reportes" style="display:none;margin-top:8px" onchange="onRecReportesDirChange()">
-            <div class="folder-path-hint" id="rec-reportes-dir-hint"></div>
+          <div class="form-group" style="margin:0;min-width:170px">
+            <label>Régimen</label>
+            <select id="tard-regimen" onchange="tardinessPersonId='';loadTardinessCalendar()">
+              <option value="">Todos</option>
+              <option value="administrativo">Administrativo</option>
+              <option value="personalizado">Personalizado</option>
+              <option value="especial">Otro régimen</option>
+              <option value="rotativo">Turnos rotativos</option>
+              <option value="nocturno">Nocturno</option>
+            </select>
           </div>
-          <div class="form-group">
-            <label>Forzar horario de sede (opcional)</label>
-            <select id="rec-sede"><option value="">Automático — usa horarios configurados en SATEC</option></select>
+          <div class="form-group" style="margin:0;flex:1;min-width:180px">
+            <label>Persona</label>
+            <input id="tard-person-q" placeholder="ID o nombre..." oninput="filterTardinessPeople()" autocomplete="off">
           </div>
-          <div class="form-group">
-            <label>Etiqueta manual (solo si fuerzas sede)</label>
-            <input id="rec-sede-label" placeholder="Opcional">
-          </div>
-          <div class="form-group" style="grid-column:1/-1">
-            <label>Subir listado alternativo (.xlsx)</label>
-            <input type="file" id="rec-lista-file" accept=".xlsx,.xls">
-          </div>
-        </div>
-        <div id="rec-status" style="font-size:13px;color:var(--muted);margin:12px 0"></div>
-        <div id="rec-files-wrap" style="margin-bottom:14px"></div>
-        <div class="btn-row">
-          <button class="btn btn-primary" onclick="calculateRecursosTardiness()">⏰ Calcular tardanzas</button>
-          <button class="btn btn-success" onclick="exportRecursosTardiness()">📊 Descargar Excel</button>
-          <label class="btn btn-outline" style="cursor:pointer">
-            📥 Importar rol de turnos
-            <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importRolTurnos(this)">
-          </label>
-          <button class="btn btn-outline" onclick="loadRecursosPage()">🔄 Actualizar carpetas</button>
+          <button class="btn btn-outline btn-sm" type="button" onclick="loadTardinessCalendar()">🔄 Actualizar</button>
+          <button class="btn btn-success btn-sm" type="button" onclick="exportTardinessCalendar()">📊 Excel</button>
         </div>
       </div>
-      <div class="card" id="rec-meta-card" style="display:none">
-        <h3>Resumen del cruce</h3>
-        <div class="stats-grid">
-          <div class="stat-card accent"><div class="label">Personas en lista</div><div class="value" id="rec-meta-lista">0</div></div>
-          <div class="stat-card green"><div class="label">Emparejadas</div><div class="value" id="rec-meta-matched">0</div></div>
-          <div class="stat-card"><div class="label">Con marcaciones</div><div class="value" id="rec-meta-attendance">0</div></div>
-          <div class="stat-card warn"><div class="label">Sin coincidencia</div><div class="value" id="rec-meta-unmatched">0</div></div>
-        </div>
-        <p id="rec-meta-files" style="font-size:12px;color:var(--muted);margin-top:10px"></p>
+      <div class="stats" style="margin:16px 0">
+        <div class="stat-card accent"><div class="label">Empleados</div><div class="value" id="tard-kpi-persons">0</div></div>
+        <div class="stat-card warn"><div class="label">Minutos del mes</div><div class="value" id="tard-kpi-minutes">0</div></div>
+        <div class="stat-card purple"><div class="label">Días con tardanza</div><div class="value" id="tard-kpi-days">0</div></div>
+        <div class="stat-card green"><div class="label">Con retraso</div><div class="value" id="tard-kpi-late">0</div></div>
       </div>
-      <div class="card" id="rec-tardiness-card" style="display:none">
-        <h3>Tardanzas del listado CAS <span id="rec-lista-only-badge" style="font-size:12px;font-weight:600;color:var(--muted)"></span></h3>
-        <div class="stats-grid">
-          <div class="stat-card warn"><div class="label">Empleados con tardanza</div><div class="value" id="rec-tard-late-persons">0</div></div>
-          <div class="stat-card accent"><div class="label">Min. netos</div><div class="value" id="rec-tard-total-min">0</div><div class="label" style="font-size:11px;margin-top:4px" id="rec-tard-total-note"></div></div>
-          <div class="stat-card green"><div class="label">Días evaluados</div><div class="value" id="rec-tard-total-days">0</div></div>
-          <div class="stat-card purple"><div class="label">Días con tardanza</div><div class="value" id="rec-tard-late-days">0</div></div>
+      <div class="tard-layout">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <h3 style="margin:0">Personas</h3>
+            <button class="btn btn-outline btn-sm" type="button" onclick="clearTardinessPerson()">Todas</button>
+          </div>
+          <div class="tard-people" id="tard-people"><div class="empty">Cargando...</div></div>
         </div>
-        <div class="table-wrap" style="margin-top:16px">
-          <table class="data-table">
-            <thead><tr><th>N°</th><th>DNI</th><th>Nombre (listado)</th><th>ID reloj</th><th>Días asistió</th><th>Días puntuales</th><th>Días tardanza</th><th>Min. bruto</th><th>Tolerancia</th><th>Min. neto</th></tr></thead>
-            <tbody id="rec-tardiness-persons"></tbody>
-          </table>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+            <h3 style="margin:0" id="tard-cal-title">Calendario</h3>
+            <span class="search-meta" id="tard-cal-hint">Pulse un día o una persona</span>
+          </div>
+          <div class="tard-cal" id="tard-cal"></div>
         </div>
-        <div class="table-wrap" style="margin-top:16px">
-          <table class="data-table">
-            <thead><tr><th>Fecha</th><th>DNI</th><th>Empleado</th><th>Entrada</th><th>Esperada</th><th>Regreso almuerzo</th><th>Tard. entrada</th><th>Tard. almuerzo</th><th>Total min.</th><th>Estado</th></tr></thead>
-            <tbody id="rec-tardiness-details"></tbody>
+      </div>
+      <div class="card" id="tard-day-card" style="display:none;margin-top:16px">
+        <h3 id="tard-day-title">Detalle del día</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Nombre</th><th>Sede</th><th>Entrada</th><th>Esperada</th><th>Min. entrada</th><th>Min. almuerzo</th><th>Total</th><th>Estado</th></tr></thead>
+            <tbody id="tard-day-body"></tbody>
           </table>
         </div>
       </div>
@@ -1489,7 +1480,7 @@ const PAGE_TITLES = {
   dashboard: 'Inicio',
   attendance: 'Control de Asistencia',
   excel: 'Importar Excel',
-  recursos: 'Tardanzas RRHH',
+  recursos: 'Tardanzas',
   offline: 'Descarga Local',
   more: 'Más opciones',
   users: 'Empleados',
@@ -1517,7 +1508,7 @@ const HOME_MODULES = [
   { page: 'devices', module: 'devices', icon: 'clock', tone: 'pink', title: 'Relojes biométricos', desc: 'Sincroniza usuarios y guarda marcaciones en la base local' },
   { page: 'attendance', module: 'attendance', icon: 'list', tone: 'purple', title: 'Control de asistencia', desc: 'Reportes de marcaciones, tardanzas y Excel' },
   { page: 'users', module: 'employees', icon: 'people', tone: 'cyan', title: 'Empleados', desc: 'Personas registradas en los relojes, por sede' },
-  { page: 'recursos', module: 'recursos', icon: 'timer', tone: 'pink', title: 'Tardanzas RRHH', desc: 'Calcula tardanzas desde listas y reportes' },
+  { page: 'recursos', module: 'recursos', icon: 'timer', tone: 'pink', title: 'Tardanzas', desc: 'Calendario mensual de minutos por sede, régimen o persona' },
   { page: 'more', module: 'more', icon: 'file', tone: 'cyan', title: 'Más opciones', desc: 'Importar Excel y descarga local del reloj' },
   { page: 'sedes', module: 'sedes', icon: 'building', tone: 'green', title: 'Sedes', desc: 'Sucursales, relojes y horario de cada sede' },
   { page: 'schedules', module: 'schedules', icon: 'calendar', tone: 'purple', title: 'Horarios', desc: 'Jornada, almuerzo y feriados' },
@@ -1922,7 +1913,7 @@ function showPage(name) {
   if (name === 'dashboard') loadDashboard();
   if (name === 'excel') loadExcelPage();
   if (name === 'more') applyNavPermissions();
-  if (name === 'recursos') loadRecursosPage();
+  if (name === 'recursos') loadTardinessCalendar();
   if (name === 'accounts') loadAccountsPage();
   if (name === 'system') loadSystemPage();
 }
@@ -2711,274 +2702,163 @@ async function loadExcelPage() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
-const REC_CUSTOM_DIR = '__custom__';
+let tardinessData = null;
+let tardinessPersonId = '';
+let tardinessDay = '';
 
-function getRecursosDirValue(kind) {
-  const select = document.getElementById(kind === 'lista' ? 'rec-lista-dir-select' : 'rec-reportes-dir-select');
-  const custom = document.getElementById(kind === 'lista' ? 'rec-lista-dir-custom' : 'rec-reportes-dir-custom');
-  if (!select) return null;
-  if (select.value === REC_CUSTOM_DIR) {
-    const path = custom?.value?.trim();
-    return path || null;
-  }
-  return select.value || null;
+function tardinessQuery() {
+  const monthVal = document.getElementById('tard-month')?.value || '';
+  const [year, month] = monthVal.split('-');
+  const params = new URLSearchParams();
+  if (year) params.set('year', year);
+  if (month) params.set('month', month);
+  const sede = document.getElementById('tard-sede')?.value;
+  const regimen = document.getElementById('tard-regimen')?.value;
+  const person = tardinessPersonId || '';
+  if (sede) params.set('sede_id', sede);
+  if (regimen) params.set('regimen', regimen);
+  if (person) params.set('user_id', person);
+  return params;
 }
 
-function renderRecFolderSelect(selectEl, options, currentPath, defaultPath) {
-  if (!selectEl) return;
-  const chosen = currentPath || defaultPath || '';
-  const items = (options || []).map(opt => {
-    const suffix = opt.exists ? `${opt.xlsx_count} .xlsx` : 'no encontrada';
-    const selected = opt.path === chosen ? ' selected' : '';
-    return `<option value="${opt.path.replace(/"/g, '&quot;')}"${selected}>${opt.label} (${suffix})</option>`;
-  }).join('');
-  const customSelected = chosen && !(options || []).some(opt => opt.path === chosen) ? ' selected' : '';
-  selectEl.innerHTML = items +
-    `<option value="${REC_CUSTOM_DIR}"${customSelected}>Otra carpeta...</option>`;
-  if (customSelected) {
-    selectEl.value = REC_CUSTOM_DIR;
-    const customInput = selectEl.id === 'rec-lista-dir-select'
-      ? document.getElementById('rec-lista-dir-custom')
-      : document.getElementById('rec-reportes-dir-custom');
-    if (customInput) {
-      customInput.style.display = 'block';
-      customInput.value = chosen;
-    }
-  }
-}
-
-function updateRecDirHint(kind, path, exists) {
-  const hint = document.getElementById(kind === 'lista' ? 'rec-lista-dir-hint' : 'rec-reportes-dir-hint');
-  if (!hint) return;
-  if (!path) {
-    hint.textContent = '';
+function renderTardinessPeople(persons) {
+  const el = document.getElementById('tard-people');
+  const q = (document.getElementById('tard-person-q')?.value || '').trim().toLowerCase();
+  const list = (persons || []).filter(p => {
+    if (!q) return true;
+    return String(p.user_id || '').toLowerCase().includes(q) || String(p.name || '').toLowerCase().includes(q);
+  });
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">Sin empleados para este filtro.</div>';
     return;
   }
-  hint.textContent = `${exists ? '✓' : '⚠'} ${path}`;
+  el.innerHTML = list.map(p => `
+    <button type="button" class="tard-person ${String(p.user_id) === String(tardinessPersonId) ? 'active' : ''}" onclick="selectTardinessPerson('${p.user_id}')">
+      <span class="mins">${p.late_minutes || 0} min</span>
+      <strong>${p.name || p.user_id}</strong>
+      <span>${p.sede || '—'} · ${p.regimen_label || 'Administrativo'} · ${p.late_days || 0} día(s)</span>
+    </button>`).join('');
 }
 
-function onRecListaDirChange() { onRecDirChange('lista'); }
-function onRecReportesDirChange() { onRecDirChange('reportes'); }
-
-function onRecDirChange(kind) {
-  const select = document.getElementById(kind === 'lista' ? 'rec-lista-dir-select' : 'rec-reportes-dir-select');
-  const custom = document.getElementById(kind === 'lista' ? 'rec-lista-dir-custom' : 'rec-reportes-dir-custom');
-  if (!select || !custom) return;
-  const isCustom = select.value === REC_CUSTOM_DIR;
-  custom.style.display = isCustom ? 'block' : 'none';
-  if (!isCustom) custom.value = '';
-  updateRecDirHint(kind, getRecursosDirValue(kind), true);
-  loadRecursosPage({ keepSelections: true });
+function tardinessDayClass(day, person) {
+  const mins = person ? (person.days || {})[day.date] || 0 : (day.late_minutes || 0);
+  if (mins >= 30) return 'heavy';
+  if (mins > 0) return 'late';
+  if ((person && person.days && day.date in person.days) || (!person && day.evaluated)) return 'ok';
+  return '';
 }
 
-async function browseRecFolder(kind) {
-  try {
-    let res = { cancelled: true, path: null };
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.browse_folder) {
-      const nativePath = await window.pywebview.api.browse_folder();
-      res = nativePath ? { cancelled: false, path: nativePath } : { cancelled: true, path: null };
-    } else {
-      res = await api('/api/recursos/browse-folder', { method: 'POST' });
-    }
-    if (res.cancelled || !res.path) return;
-    const select = document.getElementById(kind === 'lista' ? 'rec-lista-dir-select' : 'rec-reportes-dir-select');
-    const custom = document.getElementById(kind === 'lista' ? 'rec-lista-dir-custom' : 'rec-reportes-dir-custom');
-    if (!select || !custom) return;
-    select.value = REC_CUSTOM_DIR;
-    custom.style.display = 'block';
-    custom.value = res.path;
-    updateRecDirHint(kind, res.path, true);
-    await loadRecursosPage({ keepSelections: true });
-  } catch (e) { toast(e.message, 'error'); }
-}
-
-function getRecursosPayload() {
-  const listaDir = getRecursosDirValue('lista');
-  const reportesDir = getRecursosDirValue('reportes');
-  const listaFilename = document.getElementById('rec-lista-file-select')?.value?.trim() || null;
-  const sedeId = document.getElementById('rec-sede')?.value || null;
-  const sedeLabel = document.getElementById('rec-sede-label')?.value?.trim() || null;
-  const reportFiles = [...document.querySelectorAll('.rec-report-check:checked')].map(el => el.value);
-  return {
-    lista_dir: listaDir,
-    lista_filename: listaFilename,
-    reportes_dir: reportesDir,
-    report_files: reportFiles.length ? reportFiles : null,
-    sede_id: sedeId ? +sedeId : null,
-    sede_name: sedeLabel,
-  };
-}
-
-function renderRecursosTardinessReport(r) {
-  const meta = r.meta || {};
-  document.getElementById('rec-meta-card').style.display = 'block';
-  document.getElementById('rec-tardiness-card').style.display = 'block';
-  document.getElementById('rec-meta-lista').textContent = meta.lista_persons ?? 0;
-  document.getElementById('rec-meta-matched').textContent = meta.matched_persons ?? 0;
-  document.getElementById('rec-meta-attendance').textContent = meta.persons_with_attendance ?? 0;
-  document.getElementById('rec-meta-unmatched').textContent = meta.unmatched_persons ?? 0;
-  document.getElementById('rec-meta-files').textContent =
-    `Lista: ${meta.lista_file || '—'} · Marcaciones: ${meta.records_deduped ?? 0} · ` +
-    `Período: ${meta.date_from || '—'} → ${meta.date_to || '—'} · ` +
-    `Modo horario: ${meta.schedule_mode === 'forced' ? 'forzado' : 'automático por sede'} · ` +
-    (meta.report_files || []).map(f => `${f.filename}→${f.sede_name}`).join(', ');
-  document.getElementById('rec-tard-late-days').textContent = r.late_days ?? 0;
-  document.getElementById('rec-tard-total-min').textContent = r.total_late_minutes ?? 0;
-  tardinessTotalsNote(r, 'rec-tard-total-note');
-  document.getElementById('rec-tard-total-days').textContent = r.total_days ?? 0;
-  document.getElementById('rec-tard-late-persons').textContent = r.persons_with_late ?? 0;
-  const listaBadge = document.getElementById('rec-lista-only-badge');
-  if (listaBadge) {
-    listaBadge.textContent = `(solo ${meta.shown_persons ?? meta.lista_persons ?? 0} personas del Excel)`;
+function renderTardinessCalendar() {
+  const el = document.getElementById('tard-cal');
+  if (!tardinessData) { el.innerHTML = ''; return; }
+  const heads = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const person = (tardinessData.persons || []).find(p => String(p.user_id) === String(tardinessPersonId));
+  const start = tardinessData.start_weekday || 0;
+  const cells = [];
+  for (let i = 0; i < start; i++) cells.push('<div class="tard-day empty"></div>');
+  for (const day of tardinessData.days || []) {
+    const mins = person ? (person.days || {})[day.date] || 0 : day.late_minutes || 0;
+    const people = person ? (mins ? 1 : 0) : day.late_persons || 0;
+    const selected = tardinessDay === day.date ? 'selected' : '';
+    const klass = tardinessDayClass(day, person);
+    cells.push(`
+      <button type="button" class="tard-day ${klass} ${selected}" onclick="selectTardinessDay('${day.date}')">
+        <div class="n">${day.day}</div>
+        <div class="m">${mins}</div>
+        <div class="p">${people ? people + ' pers.' : '—'}</div>
+      </button>`);
   }
-  const byPerson = (r.by_person || []).slice().sort((a, b) => (a.lista_num || 0) - (b.lista_num || 0));
-  document.getElementById('rec-tardiness-persons').innerHTML = byPerson.map(p => `
+  el.innerHTML = heads.map(h => `<div class="tard-cal-head">${h}</div>`).join('') + cells.join('');
+  document.getElementById('tard-cal-title').textContent = person
+    ? `${person.name || person.user_id} · ${tardinessData.month_label}`
+    : tardinessData.month_label || 'Calendario';
+}
+
+function renderTardinessDayDetail() {
+  const card = document.getElementById('tard-day-card');
+  const body = document.getElementById('tard-day-body');
+  const title = document.getElementById('tard-day-title');
+  if (!tardinessData || !tardinessDay) { card.style.display = 'none'; return; }
+  const day = (tardinessData.days || []).find(d => d.date === tardinessDay);
+  if (!day) { card.style.display = 'none'; return; }
+  let rows = day.details || [];
+  if (tardinessPersonId) rows = rows.filter(r => String(r.user_id) === String(tardinessPersonId));
+  title.textContent = `${tardinessDay} · ${day.late_minutes || 0} min · ${rows.length} registro(s)`;
+  card.style.display = 'block';
+  body.innerHTML = rows.map(d => `
     <tr>
-      <td>${p.lista_num ?? '—'}</td>
-      <td><strong>${p.dni || '—'}</strong></td>
-      <td>${p.name || '—'}</td>
-      <td>${p.user_id || '—'}</td>
-      <td>${p.days_with_attendance ?? 0}</td>
-      <td>${p.punctual_days ?? 0}</td>
-      <td>${p.late_days ?? 0}</td>
-      <td>${p.late_minutes_gross ?? p.late_minutes ?? 0}</td>
-      <td>${p.monthly_tolerance_applied ?? 0}</td>
-      <td><strong>${p.late_minutes ?? 0}</strong>${p.sin_marcaciones ? ' <span class="badge badge-orange">Sin marcaciones</span>' : ''}</td>
-    </tr>`).join('') || '<tr><td colspan="10" class="empty">Sin datos</td></tr>';
-  const dniByUser = Object.fromEntries((r.matching?.matched || []).map(m => [m.report_user_id, m.dni]));
-  const listaIds = new Set((r.by_person || []).map(p => String(p.user_id)));
-  document.getElementById('rec-tardiness-details').innerHTML = (r.details || [])
-    .filter(d => listaIds.has(String(d.user_id)))
-    .slice(0, 800).map(d => `
-    <tr>
-      <td>${d.date}</td>
-      <td>${dniByUser[d.user_id] || '—'}</td>
+      <td>${d.user_id}</td>
       <td>${d.user_name || '—'}</td>
+      <td>${d.sede_name || '—'}</td>
       <td>${formatTime(d.entrada)}</td>
       <td>${d.hora_esperada || '—'}</td>
-      <td>${formatTime(d.entrada_almuerzo)}</td>
       <td>${d.tardanza_minutos || 0}</td>
       <td>${d.tardanza_almuerzo_minutos || 0}</td>
       <td><strong>${d.tardanza_total_minutos || 0}</strong></td>
-      <td>${estadoBadge(d.estado_asistencia)}</td>
-    </tr>`).join('') || '<tr><td colspan="10" class="empty">Sin datos</td></tr>';
+      <td>${d.estado_asistencia || '—'}</td>
+    </tr>`).join('') || '<tr><td colspan="9" class="empty">Sin tardanzas este día.</td></tr>';
 }
 
-async function loadRecursosPage(opts = {}) {
-  try {
-    const listaDir = getRecursosDirValue('lista');
-    const reportesDir = getRecursosDirValue('reportes');
-    const params = new URLSearchParams();
-    if (listaDir) params.set('lista_dir', listaDir);
-    if (reportesDir) params.set('reportes_dir', reportesDir);
-    const statusUrl = params.toString() ? `/api/recursos/status?${params}` : '/api/recursos/status';
-    const previousListaFile = document.getElementById('rec-lista-file-select')?.value || '';
-    const previousChecks = new Set(
-      [...document.querySelectorAll('.rec-report-check:checked')].map(el => el.value)
-    );
-    const [status, sedes] = await Promise.all([api(statusUrl), api('/api/sedes')]);
-    const presets = status.folder_presets || {};
-    const listaSelect = document.getElementById('rec-lista-dir-select');
-    const reportesSelect = document.getElementById('rec-reportes-dir-select');
-    if (!opts.keepSelections || !listaSelect?.options?.length) {
-      renderRecFolderSelect(listaSelect, presets.lista, listaDir, status.lista_dir);
-    }
-    if (!opts.keepSelections || !reportesSelect?.options?.length) {
-      renderRecFolderSelect(reportesSelect, presets.reportes, reportesDir, status.reportes_dir);
-    }
-    updateRecDirHint('lista', status.lista_dir, status.lista_dir_exists);
-    updateRecDirHint('reportes', status.reportes_dir, status.reportes_dir_exists);
-    const listaFileSel = document.getElementById('rec-lista-file-select');
-    if (listaFileSel) {
-      const files = status.lista_files || [];
-      listaFileSel.innerHTML = '<option value="">— Más reciente en carpeta —</option>' +
-        files.map(f => `<option value="${f.filename}">${f.filename} (${f.size_kb} KB · ${f.modified})</option>`).join('');
-      if (previousListaFile && files.some(f => f.filename === previousListaFile)) {
-        listaFileSel.value = previousListaFile;
-      } else if (status.lista_file) {
-        listaFileSel.value = status.lista_file;
-      }
-    }
-    const sedeSel = document.getElementById('rec-sede');
-    if (sedeSel && !opts.keepSelections) {
-      sedeSel.innerHTML = '<option value="">Automático — usa horarios configurados en SATEC</option>' +
-        sedes.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-    }
-    const statusEl = document.getElementById('rec-status');
-    statusEl.innerHTML =
-      `Lista: <strong>${status.lista_file || 'no encontrada'}</strong> en ${status.lista_dir} · ` +
-      `Reportes: <strong>${status.report_files.length}</strong> archivo(s) en ${status.reportes_dir} · ` +
-      `Feriados cargados: <strong>${status.holiday_count ?? 0}</strong> · ` +
-      `Tolerancia mensual: <strong>${status.monthly_tolerance_minutes ?? 20} min</strong>`;
-    const schedNote = document.getElementById('rec-schedules-note');
-    if (schedNote && (status.schedules || []).length) {
-      schedNote.textContent = 'Horarios activos: ' + status.schedules.map(s =>
-        `${s.sede_name} ${s.entry_time}-${s.exit_time}, almuerzo hasta ${s.lunch_end} (${s.work_days})`
-      ).join(' · ');
-    }
-    const filesWrap = document.getElementById('rec-files-wrap');
-    filesWrap.innerHTML = (status.report_files || []).length
-      ? `<div style="font-size:13px;font-weight:600;margin-bottom:8px">Reportes a procesar</div>` +
-        status.report_files.map(f => {
-          const checked = previousChecks.size ? previousChecks.has(f.filename) : true;
-          return `
-          <label style="display:block;font-size:13px;margin:4px 0">
-            <input type="checkbox" class="rec-report-check" value="${f.filename}" ${checked ? 'checked' : ''}>
-            ${f.filename} <span style="color:var(--muted)">(${f.sede_name_resolved || f.sede_guess} · ${f.size_kb} KB)</span>
-          </label>`;
-        }).join('')
-      : `<div class="empty">No hay reportes .xlsx en ${status.reportes_dir || 'la carpeta seleccionada'}</div>`;
-  } catch (e) { toast(e.message, 'error'); }
+function selectTardinessPerson(userId) {
+  tardinessPersonId = String(tardinessPersonId) === String(userId) ? '' : String(userId);
+  tardinessDay = '';
+  renderTardinessPeople(tardinessData?.persons || []);
+  renderTardinessCalendar();
+  renderTardinessDayDetail();
 }
 
-async function calculateRecursosTardiness() {
-  const listaUpload = document.getElementById('rec-lista-file')?.files?.[0];
-  try {
-    let r;
-    if (listaUpload) {
-      const payload = getRecursosPayload();
-      const form = new FormData();
-      form.append('lista_file', listaUpload);
-      if (payload.lista_dir) form.append('lista_dir', payload.lista_dir);
-      if (payload.reportes_dir) form.append('reportes_dir', payload.reportes_dir);
-      if (payload.report_files?.length) form.append('report_files', payload.report_files.join(','));
-      if (payload.sede_id) form.append('sede_id', payload.sede_id);
-      if (payload.sede_name) form.append('sede_name', payload.sede_name);
-      const res = await fetch('/api/recursos/tardiness/upload-lista', { method: 'POST', credentials: 'same-origin', body: form });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(parseApiError(res, err) || 'Error al calcular');
-      }
-      r = await res.json();
-    } else {
-      r = await api('/api/recursos/tardiness', { method: 'POST', body: JSON.stringify(getRecursosPayload()) });
-    }
-    renderRecursosTardinessReport(r);
-    toast(`Tardanzas RRHH: ${r.persons_with_late ?? 0} empleados con retraso`);
-  } catch (e) { toast(e.message, 'error'); }
+function clearTardinessPerson() {
+  tardinessPersonId = '';
+  tardinessDay = '';
+  renderTardinessPeople(tardinessData?.persons || []);
+  renderTardinessCalendar();
+  renderTardinessDayDetail();
 }
 
-async function exportRecursosTardiness() {
+function selectTardinessDay(date) {
+  tardinessDay = tardinessDay === date ? '' : date;
+  renderTardinessCalendar();
+  renderTardinessDayDetail();
+}
+
+function filterTardinessPeople() {
+  renderTardinessPeople(tardinessData?.persons || []);
+}
+
+async function loadTardinessCalendar() {
+  const monthEl = document.getElementById('tard-month');
+  if (monthEl && !monthEl.value) {
+    const now = new Date();
+    monthEl.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }
   try {
-    const res = await fetch('/api/recursos/tardiness/export', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(getRecursosPayload()),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(parseApiError(res, err) || 'Error al exportar');
+    const sedes = await api('/api/sedes');
+    const sedeSel = document.getElementById('tard-sede');
+    if (sedeSel && sedeSel.options.length <= 1) {
+      const cur = sedeSel.value;
+      sedeSel.innerHTML = '<option value="">Todas</option>' + sedes.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+      if (cur) sedeSel.value = cur;
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tardanzas_rrhh_${new Date().toISOString().slice(0,10)}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast('Excel de tardanzas RRHH descargado');
-  } catch (e) { toast(e.message, 'error'); }
+    tardinessData = await api('/api/tardiness/calendar?' + tardinessQuery().toString());
+    const t = tardinessData.totals || {};
+    document.getElementById('tard-kpi-persons').textContent = t.persons ?? 0;
+    document.getElementById('tard-kpi-minutes').textContent = t.late_minutes ?? 0;
+    document.getElementById('tard-kpi-days').textContent = t.late_days ?? 0;
+    document.getElementById('tard-kpi-late').textContent = t.late_persons ?? 0;
+    document.getElementById('tard-cal-hint').textContent = 'Celdas: minutos del día. Verde = 0, ámbar = retraso, rojo = 30 min o más.';
+    renderTardinessPeople(tardinessData.persons || []);
+    renderTardinessCalendar();
+    renderTardinessDayDetail();
+  } catch (e) {
+    document.getElementById('tard-people').innerHTML = `<div class="empty">${e.message}</div>`;
+    toast(e.message, 'error');
+  }
+}
+
+function exportTardinessCalendar() {
+  const q = tardinessQuery();
+  downloadAuthenticated('/api/reports/tardiness/monthly/export/xlsx?' + q.toString(), 'tardanzas_mes.xlsx')
+    .catch(e => toast(e.message, 'error'));
 }
 
 async function processExcelTardiness() {

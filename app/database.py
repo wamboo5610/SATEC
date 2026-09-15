@@ -1138,6 +1138,91 @@ def get_monthly_tardiness_report(year: int, month: int, sede_id=None, device_id=
     return data
 
 
+def infer_user_regimen(user_id: str, emp_schedules: dict | None = None) -> str:
+    rec = (emp_schedules or get_schedules_by_user_id()).get(str(user_id))
+    return al.infer_regimen(rec)
+
+
+def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, regimen: str | None = None):
+    from calendar import monthrange, weekday
+
+    data = get_monthly_tardiness_report(year, month, sede_id=sede_id, user_id=user_id)
+    emp_schedules = get_schedules_by_user_id()
+    wanted = (regimen or "").strip().lower()
+    details = list(data.get("details") or [])
+    persons = list(data.get("by_person") or [])
+
+    for person in persons:
+        person["regimen"] = infer_user_regimen(person["user_id"], emp_schedules)
+        person["regimen_label"] = al.REGIMEN_LABELS.get(person["regimen"], person["regimen"])
+    if wanted:
+        persons = [p for p in persons if p.get("regimen") == wanted]
+        allowed = {str(p["user_id"]) for p in persons}
+        details = [d for d in details if str(d.get("user_id")) in allowed]
+
+    last_day = monthrange(year, month)[1]
+    days = []
+    for day in range(1, last_day + 1):
+        date = f"{year:04d}-{month:02d}-{day:02d}"
+        day_rows = [d for d in details if d.get("date") == date and d.get("dia_laborable", True)]
+        late_rows = [d for d in day_rows if (d.get("tardanza_total_minutos") or 0) > 0]
+        days.append({
+            "date": date,
+            "day": day,
+            "weekday": weekday(year, month, day),
+            "late_minutes": sum(d.get("tardanza_total_minutos") or 0 for d in late_rows),
+            "late_persons": len({str(d.get("user_id")) for d in late_rows}),
+            "evaluated": len(day_rows),
+            "details": [
+                {
+                    "user_id": d.get("user_id"),
+                    "user_name": d.get("user_name"),
+                    "sede_name": d.get("sede_name"),
+                    "tardanza_total_minutos": d.get("tardanza_total_minutos") or 0,
+                    "tardanza_minutos": d.get("tardanza_minutos") or 0,
+                    "tardanza_almuerzo_minutos": d.get("tardanza_almuerzo_minutos") or 0,
+                    "entrada": d.get("entrada"),
+                    "hora_esperada": d.get("hora_esperada"),
+                    "estado_asistencia": d.get("estado_asistencia"),
+                    "horario_aplicado": d.get("horario_aplicado"),
+                    "horario_turno": d.get("horario_turno"),
+                }
+                for d in sorted(late_rows, key=lambda x: -(x.get("tardanza_total_minutos") or 0))
+            ],
+        })
+
+    for person in persons:
+        by_day = {}
+        for d in details:
+            if str(d.get("user_id")) != str(person["user_id"]):
+                continue
+            if not d.get("dia_laborable", True):
+                continue
+            by_day[d.get("date")] = d.get("tardanza_total_minutos") or 0
+        person["days"] = by_day
+
+    late_minutes = sum(p.get("late_minutes") or 0 for p in persons)
+    return {
+        "year": year,
+        "month": month,
+        "month_label": data.get("month_label"),
+        "date_from": data.get("date_from"),
+        "date_to": data.get("date_to"),
+        "days_in_month": last_day,
+        "start_weekday": weekday(year, month, 1),
+        "totals": {
+            "persons": len(persons),
+            "late_persons": sum(1 for p in persons if (p.get("late_minutes") or 0) > 0),
+            "late_minutes": late_minutes,
+            "late_days": sum(1 for d in days if d["late_minutes"] > 0),
+            "tolerance": data.get("monthly_tolerance_minutes", 20),
+        },
+        "regimen_options": [{"id": k, "label": v} for k, v in al.REGIMEN_LABELS.items()],
+        "days": days,
+        "persons": persons,
+    }
+
+
 def get_punch_observations_report(
     date_from=None, date_to=None, sede_id=None, device_id=None, user_id=None, source_mode: str = "auto"
 ):

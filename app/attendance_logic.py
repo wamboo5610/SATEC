@@ -303,6 +303,29 @@ def minutes_late(actual: datetime, expected: datetime) -> int:
     return max(0, int(delta))
 
 
+REGIMEN_LABELS = {
+    "administrativo": "Administrativo",
+    "personalizado": "Personalizado",
+    "especial": "Otro régimen",
+    "rotativo": "Turnos rotativos",
+    "nocturno": "Nocturno",
+}
+
+
+def infer_regimen(schedule: dict | None) -> str:
+    if not schedule:
+        return "administrativo"
+    extras = extra_shifts_of(schedule)
+    if extras:
+        return "rotativo"
+    kind = schedule_kind(schedule)
+    if kind == "overnight":
+        return "nocturno"
+    if kind == "block":
+        return "especial"
+    return "personalizado"
+
+
 def extra_shifts_of(schedule: dict | None) -> list[dict]:
     raw = (schedule or {}).get("extra_shifts") or []
     if isinstance(raw, str):
