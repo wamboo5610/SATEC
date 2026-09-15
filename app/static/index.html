@@ -2239,12 +2239,15 @@ function fillEmployeeScheduleForm(schedule) {
   document.getElementById('emp-sch-notes').value = s.notes || '';
   const graceDetails = document.getElementById('emp-sch-grace-details');
   if (graceDetails) graceDetails.open = (+(s.grace_minutes || 0) > 0 || +(s.lunch_grace_minutes || 0) > 0);
-  const hasCustom = !!employeeSchedulesMap[employeeScheduleEditing?.user_id];
+  const hasCustom = s.is_custom === true || !!employeeSchedulesMap[employeeScheduleEditing?.user_id];
   document.getElementById('emp-sch-remove-btn').style.display = hasCustom ? 'inline-flex' : 'none';
   const n = 1 + extras.length;
+  const sedeLabel = s.sede_name ? `sede ${s.sede_name}` : 'la sede';
   document.getElementById('emp-sch-status').textContent = hasCustom
-    ? `${n > 1 ? n + ' turnos rotativos' : 'Horario personalizado'} · actualizado: ${s.updated_at || '—'}`
-    : 'Sin horario personalizado. Se usará el horario de la sede hasta que guardes uno.';
+    ? `${n > 1 ? n + ' turnos rotativos' : 'Horario personalizado'} · ${s.entry_time}–${s.exit_time} · actualizado: ${s.updated_at || '—'}`
+    : `Usa el horario de ${sedeLabel}: ${s.entry_time || '08:00'}–${s.exit_time || '17:00'}` +
+      (s.lunch_start && s.lunch_end ? ` · almuerzo ${s.lunch_start}–${s.lunch_end}` : '') +
+      '. Si guarda, queda como personalizado.';
 }
 
 async function openEmployeeScheduleModal(userId, userName) {
@@ -2253,10 +2256,11 @@ async function openEmployeeScheduleModal(userId, userName) {
   document.getElementById('emp-sch-subtitle').textContent = `${userName || 'Sin nombre'} · ID ${userId}`;
   closeMobileMenu();
   try {
-    const schedule = await api(`/api/employee-schedules/${userId}`);
+    const schedule = await api(`/api/employee-schedules/${encodeURIComponent(userId)}`);
     fillEmployeeScheduleForm(schedule);
   } catch (e) {
     fillEmployeeScheduleForm(null);
+    toast(e.message, 'error');
   }
   document.getElementById('employee-schedule-modal').classList.add('open');
 }
@@ -4395,6 +4399,7 @@ function exportXLSX(format = 'person', filterOpts = {}) {
 
 let allUsersList = [];
 let usersViewMode = 'list';
+let sedeSchedulesMap = {};
 
 function setUsersView(mode) {
   usersViewMode = mode;
@@ -4405,12 +4410,16 @@ function setUsersView(mode) {
   filterUsers();
 }
 
-function userHorarioBadge(userId) {
+function userHorarioBadge(userId, sedeId) {
   const custom = employeeSchedulesMap[userId];
-  if (!custom) return '<span class="badge badge-gray">Horario de sede</span>';
-  const extra = Array.isArray(custom.extra_shifts) ? custom.extra_shifts.length : 0;
-  if (extra) return `<span class="badge badge-orange">${extra + 1} turnos</span>`;
-  return `<span class="badge badge-orange">${custom.entry_time}–${custom.exit_time}</span>`;
+  if (custom) {
+    const extra = Array.isArray(custom.extra_shifts) ? custom.extra_shifts.length : 0;
+    if (extra) return `<span class="badge badge-orange">${extra + 1} turnos</span>`;
+    return `<span class="badge badge-orange">${custom.entry_time}–${custom.exit_time}</span>`;
+  }
+  const sede = sedeSchedulesMap[sedeId];
+  if (sede) return `<span class="badge badge-gray">Sede ${sede.entry_time}–${sede.exit_time}</span>`;
+  return '<span class="badge badge-gray">Horario de sede</span>';
 }
 
 let employeeProfileEditing = null;
@@ -4671,7 +4680,7 @@ function renderUsersBySede(list) {
               <td><strong>${u.user_id}</strong></td>
               <td>${u.name || '—'}</td>
               <td style="font-size:12px;color:var(--muted)">${u.device_name || '—'}</td>
-              <td>${userHorarioBadge(u.user_id)}</td>
+              <td>${userHorarioBadge(u.user_id, u.sede_id)}</td>
               <td><button class="btn btn-outline btn-sm" onclick="openEmployeeScheduleModal('${u.user_id}', '${safeName}')">Ver horario</button></td>
             </tr>`;
           }).join('')}</tbody>
@@ -4691,8 +4700,13 @@ function filterUsers() {
 
 async function loadUsers() {
   try {
-    const [rows, empSchedules] = await Promise.all([api('/api/users'), api('/api/employee-schedules')]);
+    const [rows, empSchedules, schedules] = await Promise.all([
+      api('/api/users'),
+      api('/api/employee-schedules'),
+      api('/api/schedules'),
+    ]);
     employeeSchedulesMap = Object.fromEntries(empSchedules.map(s => [s.user_id, s]));
+    sedeSchedulesMap = Object.fromEntries((schedules || []).map(s => [s.sede_id, s]));
     allUsersList = rows.sort((a, b) => {
       const sedeCmp = (a.sede_name || 'Sin sede').localeCompare(b.sede_name || 'Sin sede', 'es');
       if (sedeCmp !== 0) return sedeCmp;

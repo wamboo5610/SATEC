@@ -1094,6 +1094,56 @@ def get_employee_schedule(user_id: str):
         return _decode_employee_schedule(dict(row)) if row else None
 
 
+def get_user_sede_id(user_id: str) -> int | None:
+    uid = str(user_id)
+    profiles = get_employee_profiles_map()
+    profile = profiles.get(uid)
+    if profile and profile.get("sede_id"):
+        return profile["sede_id"]
+    device_map = get_device_serial_map()
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT device_serial FROM users_cache WHERE user_id=? LIMIT 1",
+            (uid,),
+        ).fetchone()
+    if not row:
+        return None
+    return device_map.get(row["device_serial"] or "", {}).get("sede_id")
+
+
+def get_effective_employee_schedule(user_id: str) -> dict:
+    uid = str(user_id)
+    custom = get_employee_schedule(uid)
+    if custom:
+        custom["source"] = "personalizado"
+        custom["is_custom"] = True
+        return custom
+    sede_id = get_user_sede_id(uid)
+    if sede_id:
+        sede_sched = get_work_schedule(sede_id)
+        if sede_sched:
+            data = dict(sede_sched)
+            data["source"] = "sede"
+            data["is_custom"] = False
+            data["user_id"] = uid
+            data["extra_shifts"] = []
+            return data
+    return {
+        "user_id": uid,
+        "source": "sede",
+        "is_custom": False,
+        "entry_time": "08:00",
+        "exit_time": "17:00",
+        "lunch_start": "12:00",
+        "lunch_end": "14:30",
+        "grace_minutes": 0,
+        "lunch_grace_minutes": 0,
+        "schedule_kind": "split",
+        "extra_shifts": [],
+        "sede_name": None,
+    }
+
+
 def _decode_employee_schedule(row: dict) -> dict:
     data = dict(row)
     raw = data.get("extra_shifts")

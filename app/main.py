@@ -522,10 +522,7 @@ def list_employee_schedules_page():
 
 @app.get("/api/employee-schedules/{user_id}")
 def get_employee_schedule_page(user_id: str):
-    schedule = db.get_employee_schedule(user_id)
-    if not schedule:
-        raise HTTPException(404, "Horario personalizado no configurado")
-    return schedule
+    return db.get_effective_employee_schedule(user_id)
 
 
 @app.put("/api/employee-schedules/{user_id}")
