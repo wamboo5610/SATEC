@@ -71,7 +71,7 @@
     .menu-btn { width:40px; height:40px; border:1px solid var(--border); border-radius:8px; background:var(--surface2); color:var(--text); font-size:18px; cursor:pointer; flex-shrink:0; }
     .mobile-title { flex:1; font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .sidebar-close { display:none; position:absolute; top:14px; right:14px; width:32px; height:32px; border:none; border-radius:8px; background:var(--surface2); color:var(--text); font-size:18px; cursor:pointer; }
-    .app-topbar { display:flex; justify-content:space-between; align-items:center; gap:16px; margin:0 0 20px; padding:0 0 14px; background:transparent; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:90; }
+    .app-topbar { display:flex; justify-content:space-between; align-items:center; gap:16px; margin:0; padding:14px 24px; background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:90; box-shadow:0 8px 18px rgba(18,32,24,.06); }
     .app-topbar-title { font-size:16px; font-weight:700; }
     .app-topbar-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
     .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; padding-bottom:20px; border-bottom:1px solid var(--border); }
@@ -143,13 +143,14 @@
     .nav-btn .rail-ico svg { width:20px; height:20px; display:block; flex-shrink:0; }
     .nav-btn .rail-label { line-height:1.2; overflow:hidden; text-overflow:ellipsis; }
     .main {
-      min-width:0; height:100%; overflow:auto; padding:20px 24px 36px;
-      background:
-        radial-gradient(820px 380px at 100% 0%, rgba(8,136,48,.12), transparent 52%),
-        radial-gradient(640px 360px at 0% 100%, rgba(8,64,168,.12), transparent 50%);
+      min-width:0; height:100%; overflow:auto; padding:0 0 36px;
+      background:var(--bg);
     }
-    .page { display:none; }
+    .page { display:none; padding:20px 24px 0; }
     .page.active { display:block; }
+    .update-banner { margin:16px 24px 0; }
+    .sched-tab-panel { display:none; }
+    .sched-tab-panel.active { display:block; }
     .page-header { margin-bottom:24px; }
     .page-header h2 { font-size:24px; font-weight:700; margin-bottom:6px; }
     .page-header p { color:var(--muted); font-size:14px; }
@@ -264,8 +265,10 @@
       .sidebar{position:fixed;top:0;left:0;bottom:0;width:min(260px,88vw);height:100%;transform:translateX(-105%);transition:transform .25s ease;box-shadow:var(--shadow)}
       .sidebar.open{transform:translateX(0)}
       .sidebar-close{display:flex;align-items:center;justify-content:center}
-      .main{padding:16px;height:auto}
-      .app-topbar{margin:0 0 16px;padding:0 0 12px;top:52px}
+      .main{padding:0 0 24px;height:auto}
+      .app-topbar{padding:12px 16px;top:52px;background:var(--surface)}
+      .page{padding:16px 16px 0}
+      .update-banner{margin:12px 16px 0}
       .app-topbar-title{font-size:14px}
       .user-menu-info{display:none}
       .user-menu-chevron{display:none}
@@ -1021,105 +1024,106 @@
     <section class="page" id="page-schedules">
       <div class="page-header">
         <h2>Horarios Laborales</h2>
-        <p>Configura entrada, salida y almuerzo por sede para calcular tardanzas automáticamente</p>
+        <p>Jornada por sede, personalizados y feriados. Al aplicar un horario de sede no se toca a quienes ya tienen uno propio.</p>
       </div>
-      <div class="alert alert-info">
-        <strong>Cómo funciona:</strong> La tardanza de entrada se calcula desde la primera marcación del día.
-        La tardanza de almuerzo se calcula cuando el empleado regresa después de la hora de fin de almuerzo.
-        Por defecto el trabajo es de <strong>lunes a viernes</strong>; sábado y domingo no cuentan como tardanza.
-        Los <strong>feriados</strong> tampoco se evalúan como tardanza ni puntualidad.
-        <br><br>
-        <strong>Clasificación de las 4 marcaciones por hora:</strong>
-        entrada mañana <strong>05:00–09:00</strong> · salida mañana <strong>12:00–14:00</strong> ·
-        entrada tarde <strong>14:01–15:00</strong> (hora esperada <strong>14:30</strong>, tardanza después de las 14:30) · salida tarde <strong>17:00–23:59</strong>.
-        <br><br>
-        La tolerancia mensual de 20 minutos es <strong>opcional</strong> y se activa en el módulo Tardanzas.
+      <div class="mode-toggle" id="sched-tabs" style="margin-bottom:16px">
+        <button class="mode-btn active" type="button" data-sched-tab="edit" onclick="showSchedTab('edit')">Editar sede</button>
+        <button class="mode-btn" type="button" data-sched-tab="list" onclick="showSchedTab('list')">Configurados</button>
+        <button class="mode-btn" type="button" data-sched-tab="custom" onclick="showSchedTab('custom')">Personalizados</button>
+        <button class="mode-btn" type="button" data-sched-tab="holidays" onclick="showSchedTab('holidays')">Feriados</button>
       </div>
-      <div class="card">
-        <h3>Seleccionar sede</h3>
-        <div class="grid-2">
+
+      <div class="sched-tab-panel active" id="sched-tab-edit">
+        <div class="card">
+          <h3>Sede</h3>
           <div class="form-group">
-            <label>Sede</label>
+            <label>Seleccionar sede</label>
             <select id="schedule-sede" onchange="loadScheduleForm()"></select>
           </div>
         </div>
-      </div>
-      <div class="card" id="schedule-form-card">
-        <h3>Horario de la sede</h3>
-        <div class="grid-2">
-          <div class="form-group"><label>Hora de entrada</label><input type="time" id="sch-entry" value="08:00"></div>
-          <div class="form-group"><label>Hora de salida</label><input type="time" id="sch-exit" value="17:00"></div>
-          <div class="form-group"><label>Inicio almuerzo</label><input type="time" id="sch-lunch-start" value="12:00"></div>
-          <div class="form-group"><label>Entrada tarde esperada</label><input type="time" id="sch-lunch-end" value="14:30"></div>
-        </div>
-        <details id="sch-daily-grace-details" style="margin-top:12px">
-          <summary style="cursor:pointer;font-size:13px;color:var(--muted)">Opcional: tolerancia diaria por marcación</summary>
-          <p style="font-size:12px;color:var(--muted);margin:8px 0 0">Solo si necesitas minutos extra por entrada o regreso de almuerzo. La política habitual es la tolerancia mensual de 20 min.</p>
-          <div class="grid-2" style="margin-top:8px">
-            <div class="form-group"><label>Tolerancia entrada (min)</label><input type="number" id="sch-grace" value="0" min="0" max="60"></div>
-            <div class="form-group"><label>Tolerancia almuerzo (min)</label><input type="number" id="sch-lunch-grace" value="0" min="0" max="60"></div>
+        <div class="card" id="schedule-form-card">
+          <h3>Horario de la sede</h3>
+          <div class="grid-2">
+            <div class="form-group"><label>Hora de entrada</label><input type="time" id="sch-entry" value="08:00"></div>
+            <div class="form-group"><label>Hora de salida</label><input type="time" id="sch-exit" value="17:00"></div>
+            <div class="form-group"><label>Inicio almuerzo</label><input type="time" id="sch-lunch-start" value="12:00"></div>
+            <div class="form-group"><label>Entrada tarde esperada</label><input type="time" id="sch-lunch-end" value="14:30"></div>
           </div>
-        </details>
-        <div class="form-group" style="margin-top:12px">
-          <label>Días laborables</label>
-          <div class="btn-row" style="flex-wrap:wrap;gap:10px">
-            <label class="chk-label"><input type="checkbox" id="sch-work-mon" checked> Lun</label>
-            <label class="chk-label"><input type="checkbox" id="sch-work-tue" checked> Mar</label>
-            <label class="chk-label"><input type="checkbox" id="sch-work-wed" checked> Mié</label>
-            <label class="chk-label"><input type="checkbox" id="sch-work-thu" checked> Jue</label>
-            <label class="chk-label"><input type="checkbox" id="sch-work-fri" checked> Vie</label>
-            <label class="chk-label"><input type="checkbox" id="sch-work-sat"> Sáb</label>
-            <label class="chk-label"><input type="checkbox" id="sch-work-sun"> Dom</label>
+          <details id="sch-daily-grace-details" style="margin-top:12px">
+            <summary style="cursor:pointer;font-size:13px;color:var(--muted)">Opcional: tolerancia diaria por marcación</summary>
+            <div class="grid-2" style="margin-top:8px">
+              <div class="form-group"><label>Tolerancia entrada (min)</label><input type="number" id="sch-grace" value="0" min="0" max="60"></div>
+              <div class="form-group"><label>Tolerancia almuerzo (min)</label><input type="number" id="sch-lunch-grace" value="0" min="0" max="60"></div>
+            </div>
+          </details>
+          <div class="form-group" style="margin-top:12px">
+            <label>Días laborables</label>
+            <div class="btn-row" style="flex-wrap:wrap;gap:10px">
+              <label class="chk-label"><input type="checkbox" id="sch-work-mon" checked> Lun</label>
+              <label class="chk-label"><input type="checkbox" id="sch-work-tue" checked> Mar</label>
+              <label class="chk-label"><input type="checkbox" id="sch-work-wed" checked> Mié</label>
+              <label class="chk-label"><input type="checkbox" id="sch-work-thu" checked> Jue</label>
+              <label class="chk-label"><input type="checkbox" id="sch-work-fri" checked> Vie</label>
+              <label class="chk-label"><input type="checkbox" id="sch-work-sat"> Sáb</label>
+              <label class="chk-label"><input type="checkbox" id="sch-work-sun"> Dom</label>
+            </div>
           </div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" onclick="saveSchedule()">💾 Guardar horario</button>
-          <button class="btn btn-outline" type="button" onclick="applySedeSchedule('inherit')">Aplicar a todos los empleados de la sede</button>
-          <button class="btn btn-outline" type="button" onclick="applySedeSchedule('copy')">Copiar como horario personalizado</button>
-        </div>
-        <p style="font-size:12px;color:var(--muted);margin-top:12px">
-          <strong>Aplicar a todos</strong> quita horarios personalizados y usa el de la sede.
-          <strong>Copiar</strong> deja ese horario fijado en cada empleado (aunque luego cambie el de la sede).
-        </p>
-        <p style="font-size:12px;color:var(--muted);margin-top:8px" id="schedule-updated">—</p>
-      </div>
-      <div class="card" id="holidays-card">
-        <h3>Feriados</h3>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
-          Los feriados nacionales aplican a todas las sedes. Puedes agregar feriados locales por sede.
-        </p>
-        <div class="grid-2">
-          <div class="form-group"><label>Fecha</label><input type="date" id="holiday-date"></div>
-          <div class="form-group"><label>Nombre</label><input id="holiday-name" placeholder="Ej: Día del Trabajo"></div>
-          <div class="form-group">
-            <label>Alcance</label>
-            <select id="holiday-sede">
-              <option value="">Todas las sedes (nacional)</option>
-            </select>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveSchedule()">💾 Guardar horario</button>
+            <button class="btn btn-outline" type="button" onclick="applySedeSchedule('inherit')">Aplicar a la sede (excepto personalizados)</button>
           </div>
+          <p style="font-size:12px;color:var(--muted);margin-top:12px">
+            Al aplicar, todos los de la sede usan este horario. <strong>Quienes ya tienen horario personalizado no se modifican.</strong>
+          </p>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px" id="schedule-updated">—</p>
         </div>
-        <div class="btn-row">
-          <button class="btn btn-primary btn-sm" type="button" onclick="addHoliday()">➕ Agregar feriado</button>
-          <button class="btn btn-outline btn-sm" type="button" onclick="seedPeruHolidays()">🇵🇪 Cargar feriados Perú 2026</button>
-        </div>
-        <div id="holidays-list" class="empty" style="margin-top:16px">Cargando feriados...</div>
       </div>
-      <div class="card">
-        <h3>Horarios configurados</h3>
-        <div id="schedules-list" class="empty">Cargando...</div>
-      </div>
-      <div class="card">
-        <h3>Horarios personalizados por empleado</h3>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
-          Estos empleados tienen un horario distinto al de su sede, o varios turnos (serenos). El cálculo usa el turno que mejor calza con la primera marcación del día.
-        </p>
-        <div class="btn-row" style="margin-bottom:12px">
-          <label class="btn btn-outline btn-sm" style="cursor:pointer">
-            📥 Importar rol de turnos (Excel)
-            <input type="file" id="rol-turnos-file" accept=".xlsx,.xls" style="display:none" onchange="importRolTurnos(this)">
-          </label>
+
+      <div class="sched-tab-panel" id="sched-tab-list">
+        <div class="card">
+          <h3>Horarios configurados</h3>
+          <div id="schedules-list" class="empty">Cargando...</div>
         </div>
-        <div id="employee-schedules-list" class="empty">Cargando...</div>
+      </div>
+
+      <div class="sched-tab-panel" id="sched-tab-custom">
+        <div class="card">
+          <h3>Horarios personalizados</h3>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+            Empleados con horario distinto al de su sede o con varios turnos. Puede importar el rol de turnos.
+          </p>
+          <div class="btn-row" style="margin-bottom:12px">
+            <label class="btn btn-outline btn-sm" style="cursor:pointer">
+              📥 Importar rol de turnos (Excel)
+              <input type="file" id="rol-turnos-file" accept=".xlsx,.xls" style="display:none" onchange="importRolTurnos(this)">
+            </label>
+          </div>
+          <div id="employee-schedules-list" class="empty">Cargando...</div>
+        </div>
+      </div>
+
+      <div class="sched-tab-panel" id="sched-tab-holidays">
+        <div class="card" id="holidays-card">
+          <h3>Feriados</h3>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
+            Los feriados nacionales aplican a todas las sedes. Puede agregar feriados locales por sede.
+          </p>
+          <div class="grid-2">
+            <div class="form-group"><label>Fecha</label><input type="date" id="holiday-date"></div>
+            <div class="form-group"><label>Nombre</label><input id="holiday-name" placeholder="Ej: Día del Trabajo"></div>
+            <div class="form-group">
+              <label>Alcance</label>
+              <select id="holiday-sede">
+                <option value="">Todas las sedes (nacional)</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-primary btn-sm" type="button" onclick="addHoliday()">➕ Agregar feriado</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="seedPeruHolidays()">🇵🇪 Cargar feriados Perú 2026</button>
+          </div>
+          <div id="holidays-list" class="empty" style="margin-top:16px">Cargando feriados...</div>
+        </div>
       </div>
     </section>
 
@@ -1362,7 +1366,7 @@
 
 <div class="modal" id="employee-schedule-modal">
   <div class="modal-card wide">
-    <h3 id="emp-sch-title">Gestionar horario</h3>
+    <h3 id="emp-sch-title">Ver / editar horario</h3>
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px" id="emp-sch-subtitle">—</p>
     <div class="alert alert-info" style="margin-bottom:12px">
       Un horario (administrativo) o varios turnos (serenos). Si hay varios, SATEC usa el que más se acerca a la primera marcación del día.
@@ -2245,7 +2249,7 @@ function fillEmployeeScheduleForm(schedule) {
 
 async function openEmployeeScheduleModal(userId, userName) {
   employeeScheduleEditing = { user_id: String(userId), user_name: userName || '' };
-  document.getElementById('emp-sch-title').textContent = 'Gestionar horario';
+  document.getElementById('emp-sch-title').textContent = 'Ver / editar horario';
   document.getElementById('emp-sch-subtitle').textContent = `${userName || 'Sin nombre'} · ID ${userId}`;
   closeMobileMenu();
   try {
@@ -3160,6 +3164,15 @@ async function loadPunchObservations() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+function showSchedTab(name) {
+  document.querySelectorAll('#sched-tabs .mode-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.schedTab === name);
+  });
+  document.querySelectorAll('.sched-tab-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === 'sched-tab-' + name);
+  });
+}
+
 async function loadSchedulesPage() {
   try {
     const [sedes, schedules, empSchedules, holidays] = await Promise.all([
@@ -3189,7 +3202,7 @@ async function loadSchedulesPage() {
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-outline btn-sm" onclick="editSchedule(${s.sede_id})">Editar</button>
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('schedule-sede').value=${s.sede_id};applySedeSchedule('inherit')">Aplicar a empleados</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('schedule-sede').value=${s.sede_id};applySedeSchedule('inherit')">Aplicar (excepto personalizados)</button>
           </div>
         </div>`).join('');
     }
@@ -3262,6 +3275,7 @@ async function seedPeruHolidays() {
 
 async function editSchedule(sedeId) {
   showPage('schedules');
+  showSchedTab('edit');
   try { await loadSchedulesPage(); } catch (e) { /* ignore */ }
   const sel = document.getElementById('schedule-sede');
   if (sel) sel.value = String(sedeId);
@@ -3276,7 +3290,7 @@ async function applySedeSchedule(mode) {
   const inherit = mode === 'inherit';
   const ok = confirm(
     inherit
-      ? `¿Aplicar el horario de "${sedeName}" a TODOS sus empleados?\nSe quitarán horarios personalizados de esa sede.`
+      ? `¿Aplicar el horario de "${sedeName}" a los empleados de esa sede?\nQuienes ya tienen horario personalizado no se modificarán.`
       : `¿Copiar el horario de "${sedeName}" como personalizado a TODOS sus empleados?`
   );
   if (!ok) return;
@@ -4532,7 +4546,7 @@ function userRowHtml(u) {
     <td style="white-space:nowrap">
       <button class="btn btn-outline btn-sm" onclick='openEmployeeProfileModal(${JSON.stringify(u.user_id)}, ${JSON.stringify(u.name || "")}, ${JSON.stringify(u.dni || u.user_id)}, ${JSON.stringify(u.sede_id || "")})'>Datos</button>
       <button class="btn btn-outline btn-sm" onclick='openAbsenceModal(${JSON.stringify(u.user_id)}, ${JSON.stringify(u.name || "")})'>Permiso</button>
-      <button class="btn btn-outline btn-sm" onclick="openEmployeeScheduleModal('${u.user_id}', '${safeName}')">Horario</button>
+      <button class="btn btn-outline btn-sm" onclick="openEmployeeScheduleModal('${u.user_id}', '${safeName}')">Ver horario</button>
     </td>
   </tr>`;
 }
@@ -4658,7 +4672,7 @@ function renderUsersBySede(list) {
               <td>${u.name || '—'}</td>
               <td style="font-size:12px;color:var(--muted)">${u.device_name || '—'}</td>
               <td>${userHorarioBadge(u.user_id)}</td>
-              <td><button class="btn btn-outline btn-sm" onclick="openEmployeeScheduleModal('${u.user_id}', '${safeName}')">⏰ Gestionar horario</button></td>
+              <td><button class="btn btn-outline btn-sm" onclick="openEmployeeScheduleModal('${u.user_id}', '${safeName}')">Ver horario</button></td>
             </tr>`;
           }).join('')}</tbody>
         </table>

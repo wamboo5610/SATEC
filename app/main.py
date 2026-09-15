@@ -473,7 +473,14 @@ def apply_schedule_to_employees(sede_id: int, data: ApplyScheduleRequest):
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     if mode == "inherit":
-        message = f"Horario de sede aplicado a {result['affected']} empleado(s). Se quitaron horarios personalizados."
+        skipped = result.get("skipped_custom") or 0
+        if skipped:
+            message = (
+                f"Horario de sede guardado para {result['affected']} empleado(s). "
+                f"No se tocó a {skipped} con horario personalizado."
+            )
+        else:
+            message = f"Horario de sede aplicado a {result['affected']} empleado(s)."
     else:
         message = f"Horario copiado como personalizado a {result['affected']} empleado(s)."
     return {"message": message, **result}

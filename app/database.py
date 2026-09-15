@@ -1175,13 +1175,22 @@ def apply_sede_schedule_to_employees(sede_id: int, mode: str = "inherit", user_i
     if not ids:
         return {"affected": 0, "mode": mode}
     if mode == "inherit":
-        with get_conn() as conn:
-            placeholders = ",".join("?" * len(ids))
-            conn.execute(
-                f"DELETE FROM employee_schedules WHERE user_id IN ({placeholders})",
-                ids,
-            )
-        return {"affected": len(ids), "mode": "inherit"}
+        custom_ids = {str(s["user_id"]) for s in get_employee_schedules()}
+        if user_ids:
+            with get_conn() as conn:
+                placeholders = ",".join("?" * len(ids))
+                conn.execute(
+                    f"DELETE FROM employee_schedules WHERE user_id IN ({placeholders})",
+                    ids,
+                )
+            return {"affected": len(ids), "skipped_custom": 0, "mode": "inherit"}
+        skipped = [uid for uid in ids if uid in custom_ids]
+        affected = [uid for uid in ids if uid not in custom_ids]
+        return {
+            "affected": len(affected),
+            "skipped_custom": len(skipped),
+            "mode": "inherit",
+        }
     if mode == "copy":
         schedule = get_work_schedule(sede_id)
         if not schedule:
