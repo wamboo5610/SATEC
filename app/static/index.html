@@ -4551,7 +4551,7 @@ function userRowHtml(u) {
     <td>${u.name || '—'}</td>
     <td><span class="badge badge-blue">${u.sede_name || 'Sin sede'}</span></td>
     <td style="font-size:12px;color:var(--muted)">${u.device_name || '—'}</td>
-    <td>${userHorarioBadge(u.user_id)}</td>
+    <td>${userHorarioBadge(u.user_id, u.sede_id)}</td>
     <td style="white-space:nowrap">
       <button class="btn btn-outline btn-sm" onclick='openEmployeeProfileModal(${JSON.stringify(u.user_id)}, ${JSON.stringify(u.name || "")}, ${JSON.stringify(u.dni || u.user_id)}, ${JSON.stringify(u.sede_id || "")})'>Datos</button>
       <button class="btn btn-outline btn-sm" onclick='openAbsenceModal(${JSON.stringify(u.user_id)}, ${JSON.stringify(u.name || "")})'>Permiso</button>
