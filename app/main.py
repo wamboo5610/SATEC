@@ -168,6 +168,11 @@ class HolidayCreate(BaseModel):
     sede_id: int | None = None
 
 
+class ApplyScheduleRequest(BaseModel):
+    mode: str = "inherit"
+    user_ids: list[str] | None = None
+
+
 class PunchRemedyCreate(BaseModel):
     user_id: str
     work_date: str
@@ -450,6 +455,25 @@ def update_schedule(sede_id: int, data: WorkScheduleUpdate):
         raise HTTPException(404, "Sede no encontrada")
     db.save_work_schedule(sede_id, **data.model_dump(exclude_none=True))
     return {"message": "Horario guardado", "schedule": db.get_work_schedule(sede_id)}
+
+
+@app.post("/api/schedules/{sede_id}/apply-employees")
+def apply_schedule_to_employees(sede_id: int, data: ApplyScheduleRequest):
+    sedes = {s["id"] for s in db.get_sedes()}
+    if sede_id not in sedes:
+        raise HTTPException(404, "Sede no encontrada")
+    mode = (data.mode or "inherit").strip().lower()
+    if mode not in ("inherit", "copy"):
+        raise HTTPException(400, "Use mode=inherit (horario de sede) o mode=copy (copiar como personalizado)")
+    try:
+        result = db.apply_sede_schedule_to_employees(sede_id, mode, data.user_ids)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if mode == "inherit":
+        message = f"Horario de sede aplicado a {result['affected']} empleado(s). Se quitaron horarios personalizados."
+    else:
+        message = f"Horario copiado como personalizado a {result['affected']} empleado(s)."
+    return {"message": message, **result}
 
 
 @app.get("/api/holidays")

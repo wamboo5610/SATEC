@@ -82,6 +82,15 @@
     .search-bar input { flex:1; min-width:220px; padding:10px 14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:14px; }
     .search-bar input:focus { outline:none; border-color:var(--accent); }
     .search-meta { font-size:12px; color:var(--muted); white-space:nowrap; }
+    .search-wrap { position:relative; flex:1 1 280px; min-width:240px; }
+    .search-wrap input[type="search"] { width:100%; padding:12px 42px 12px 40px; font-size:15px; border-radius:12px; }
+    .search-wrap .search-ico { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+    .search-wrap .search-clear { position:absolute; right:8px; top:50%; transform:translateY(-50%); border:none; background:transparent; color:var(--muted); width:28px; height:28px; border-radius:50%; cursor:pointer; display:none; }
+    .search-wrap.has-value .search-clear { display:inline-flex; align-items:center; justify-content:center; }
+    .search-wrap .search-clear:hover { background:var(--surface2); color:var(--text); }
+    .users-toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    .more-hub { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+    .more-hub .mod-tile { text-align:left; min-height:140px; }
     .device-actions { display:flex; gap:6px; flex-wrap:wrap; }
     .status-pill { display:flex; align-items:center; gap:6px; background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:var(--accent2); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600; }
     .chart-bars { display:flex; align-items:flex-end; gap:8px; height:140px; padding:22px 4px 26px; overflow:hidden; }
@@ -292,17 +301,13 @@
         <span class="rail-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></svg></span>
         <span class="rail-label">Tardanzas</span>
       </button>
-      <button class="nav-btn" data-page="offline" data-module="offline" title="Descarga local">
-        <span class="rail-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 19h14"/></svg></span>
-        <span class="rail-label">Descarga</span>
-      </button>
-      <button class="nav-btn" data-page="excel" data-module="excel" title="Importar Excel">
-        <span class="rail-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg></span>
-        <span class="rail-label">Excel</span>
-      </button>
     </nav>
     <div class="nav-section">Más</div>
     <nav class="nav">
+      <button class="nav-btn" data-page="more" data-module="more" title="Más opciones">
+        <span class="rail-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span>
+        <span class="rail-label">Más opciones</span>
+      </button>
       <button class="nav-btn" data-page="sedes" data-module="sedes" title="Sedes">
         <span class="rail-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-6h6v6"/></svg></span>
         <span class="rail-label">Sedes</span>
@@ -450,8 +455,27 @@
     </section>
 
     <!-- SEDES -->
+    <section class="page" id="page-more">
+      <div class="page-header">
+        <h2>Más opciones</h2>
+        <p>Herramientas extra: importar Excel del reloj y descarga local por cable.</p>
+      </div>
+      <div class="more-hub">
+        <button type="button" class="mod-tile cyan" id="more-tile-excel" onclick="showPage('excel')">
+          <span class="mod-ico"></span>
+          <h3>Importar Excel</h3>
+          <p>Carga reportes exportados del reloj y calcula tardanzas.</p>
+        </button>
+        <button type="button" class="mod-tile purple" id="more-tile-offline" onclick="showPage('offline')">
+          <span class="mod-ico"></span>
+          <h3>Descarga local</h3>
+          <p>Conecta el cable al reloj y baja marcaciones sin internet.</p>
+        </button>
+      </div>
+    </section>
+
     <section class="page" id="page-sedes">
-      <div class="page-header"><h2>Sedes / Sucursales</h2><p>Organiza tus relojes por ubicación</p></div>
+      <div class="page-header"><h2>Sedes / Sucursales</h2><p>Organiza tus relojes por ubicación. Desde aquí también puedes editar el horario de cada sede.</p></div>
       <div class="grid-2">
         <div class="card">
           <h3>Nueva sede</h3>
@@ -804,7 +828,7 @@
     <section class="page" id="page-excel">
       <div class="page-header">
         <h2>Importar Excel de Reloj</h2>
-        <p>Carga reportes exportados del reloj ZKTeco (sin internet) y calcula tardanzas por empleado</p>
+        <p><button class="btn btn-outline btn-sm" type="button" onclick="showPage('more')">← Más opciones</button> · Carga reportes exportados del reloj ZKTeco y calcula tardanzas</p>
       </div>
       <div class="alert alert-info">
         <strong>Formato esperado:</strong> Excel exportado desde el reloj con columnas <em>ID</em>, <em>Nombre</em> y <em>Fecha / Hora</em>
@@ -1049,8 +1073,14 @@
         </div>
         <div class="btn-row">
           <button class="btn btn-primary" onclick="saveSchedule()">💾 Guardar horario</button>
+          <button class="btn btn-outline" type="button" onclick="applySedeSchedule('inherit')">Aplicar a todos los empleados de la sede</button>
+          <button class="btn btn-outline" type="button" onclick="applySedeSchedule('copy')">Copiar como horario personalizado</button>
         </div>
-        <p style="font-size:12px;color:var(--muted);margin-top:12px" id="schedule-updated">—</p>
+        <p style="font-size:12px;color:var(--muted);margin-top:12px">
+          <strong>Aplicar a todos</strong> quita horarios personalizados y usa el de la sede.
+          <strong>Copiar</strong> deja ese horario fijado en cada empleado (aunque luego cambie el de la sede).
+        </p>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px" id="schedule-updated">—</p>
       </div>
       <div class="card" id="holidays-card">
         <h3>Feriados</h3>
@@ -1090,7 +1120,7 @@
     <section class="page" id="page-offline">
       <div class="page-header">
         <h2>Descarga Local (sin internet)</h2>
-        <p>Conecta tu laptop al reloj por cable de red, descarga los registros y guárdalos para calcular tardanzas y exportar después.</p>
+        <p><button class="btn btn-outline btn-sm" type="button" onclick="showPage('more')">← Más opciones</button> · Conecta el reloj por cable, descarga registros y calcúlalos después.</p>
       </div>
       <div class="alert alert-info">
         <strong>Modo campo:</strong> No necesitas internet. En esta aplicación de escritorio, conecta el cable de red al reloj,
@@ -1144,22 +1174,39 @@
       </div>
       <div class="card">
         <div class="search-bar">
-          <div class="form-group" style="margin:0;min-width:180px">
+          <div class="search-wrap" id="users-search-wrap">
+            <span class="search-ico">🔍</span>
+            <input type="search" id="users-search" placeholder="Buscar por ID, nombre, sede o reloj..." oninput="onUsersSearchInput()" autocomplete="off">
+            <button type="button" class="search-clear" id="users-search-clear" onclick="clearUsersSearch()" title="Limpiar">✕</button>
+          </div>
+          <div class="form-group" style="margin:0;min-width:160px">
             <label>Sede</label>
             <select id="users-sede" onchange="filterUsers()"><option value="">Todas las sedes</option></select>
           </div>
-          <input type="search" id="users-search" placeholder="🔍 Buscar por ID o nombre..." oninput="filterUsers()" autocomplete="off">
+          <div class="form-group" style="margin:0;min-width:150px">
+            <label>Horario</label>
+            <select id="users-horario" onchange="filterUsers()">
+              <option value="">Todos</option>
+              <option value="sede">Horario de sede</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </div>
           <span class="search-meta" id="users-count"></span>
           <div class="mode-toggle" style="margin:0">
             <button class="mode-btn active" id="users-view-list" type="button" onclick="setUsersView('list')">Lista</button>
             <button class="mode-btn" id="users-view-group" type="button" onclick="setUsersView('group')">Por sede</button>
           </div>
-          <button class="btn btn-outline btn-sm" type="button" onclick="exportAllUsers()">📥 Descargar empleados (CSV)</button>
+          <button class="btn btn-outline btn-sm" type="button" onclick="exportAllUsers()">📥 CSV</button>
+        </div>
+        <div class="users-toolbar">
+          <label class="chk-label"><input type="checkbox" id="users-select-all" onchange="toggleSelectAllUsers(this.checked)"> Seleccionar visibles</label>
+          <button class="btn btn-outline btn-sm" type="button" onclick="batchApplySelected('inherit')">Aplicar horario de sede a seleccionados</button>
+          <span class="search-meta" id="users-selected-count"></span>
         </div>
         <div class="table-wrap" id="users-table-wrap">
           <table>
-            <thead><tr><th>ID</th><th>Nombre</th><th>Sede</th><th>Reloj</th><th>Horario</th><th>Acciones</th></tr></thead>
-            <tbody id="users-tbody"><tr><td colspan="6" class="empty">Sincroniza un dispositivo o usa Descarga Local.</td></tr></tbody>
+            <thead><tr><th></th><th>ID</th><th>Nombre</th><th>Sede</th><th>Reloj</th><th>Horario</th><th>Acciones</th></tr></thead>
+            <tbody id="users-tbody"><tr><td colspan="7" class="empty">Sincroniza un dispositivo o usa Descarga Local.</td></tr></tbody>
           </table>
         </div>
         <div id="users-by-sede" style="display:none"></div>
@@ -1418,14 +1465,16 @@ let passwordModalForced = false;
 const PAGE_MODULE_MAP = {
   users: 'employees',
   accounts: 'accounts',
+  more: 'more',
 };
-const PAGE_ORDER = ['dashboard', 'attendance', 'excel', 'recursos', 'offline', 'users', 'sedes', 'devices', 'schedules', 'internet', 'accounts', 'system'];
+const PAGE_ORDER = ['dashboard', 'attendance', 'recursos', 'users', 'devices', 'more', 'excel', 'offline', 'sedes', 'schedules', 'internet', 'accounts', 'system'];
 const PAGE_TITLES = {
   dashboard: 'Inicio',
   attendance: 'Control de Asistencia',
   excel: 'Importar Excel',
   recursos: 'Tardanzas RRHH',
   offline: 'Descarga Local',
+  more: 'Más opciones',
   users: 'Empleados',
   sedes: 'Sedes',
   devices: 'Relojes Biométricos',
@@ -1452,9 +1501,8 @@ const HOME_MODULES = [
   { page: 'attendance', module: 'attendance', icon: 'list', tone: 'purple', title: 'Control de asistencia', desc: 'Reportes de marcaciones, tardanzas y Excel' },
   { page: 'users', module: 'employees', icon: 'people', tone: 'cyan', title: 'Empleados', desc: 'Personas registradas en los relojes, por sede' },
   { page: 'recursos', module: 'recursos', icon: 'timer', tone: 'pink', title: 'Tardanzas RRHH', desc: 'Calcula tardanzas desde listas y reportes' },
-  { page: 'offline', module: 'offline', icon: 'download', tone: 'purple', title: 'Descarga local', desc: 'Conecta el cable al reloj y baja los datos' },
-  { page: 'excel', module: 'excel', icon: 'file', tone: 'cyan', title: 'Importar Excel', desc: 'Carga reportes exportados del reloj' },
-  { page: 'sedes', module: 'sedes', icon: 'building', tone: 'green', title: 'Sedes', desc: 'Sucursales y ubicación de cada reloj' },
+  { page: 'more', module: 'more', icon: 'file', tone: 'cyan', title: 'Más opciones', desc: 'Importar Excel y descarga local del reloj' },
+  { page: 'sedes', module: 'sedes', icon: 'building', tone: 'green', title: 'Sedes', desc: 'Sucursales, relojes y horario de cada sede' },
   { page: 'schedules', module: 'schedules', icon: 'calendar', tone: 'purple', title: 'Horarios', desc: 'Jornada, almuerzo y feriados' },
   { page: 'internet', module: 'internet', icon: 'globe', tone: 'cyan', title: 'Conexión remota', desc: 'ADMS para relojes fuera de la red local' },
   { page: 'accounts', module: 'accounts', icon: 'shield', tone: 'pink', title: 'Usuarios del sistema', desc: 'Cuentas de acceso y permisos', admin: true },
@@ -1467,6 +1515,7 @@ function pageModule(name) {
 
 function canAccess(module) {
   if (module === 'system') return true;
+  if (module === 'more') return canAccess('excel') || canAccess('offline');
   return currentUser.is_admin || (currentUser.modules || []).includes(module);
 }
 
@@ -1486,6 +1535,14 @@ function applyNavPermissions() {
       btn.style.display = canAccess(mod) ? '' : 'none';
     }
   });
+  const excelTile = document.getElementById('more-tile-excel');
+  const offlineTile = document.getElementById('more-tile-offline');
+  if (excelTile) excelTile.style.display = canAccess('excel') ? '' : 'none';
+  if (offlineTile) offlineTile.style.display = canAccess('offline') ? '' : 'none';
+  const excelIco = document.querySelector('#more-tile-excel .mod-ico');
+  const offlineIco = document.querySelector('#more-tile-offline .mod-ico');
+  if (excelIco && !excelIco.innerHTML) excelIco.innerHTML = ICO_SVG.file;
+  if (offlineIco && !offlineIco.innerHTML) offlineIco.innerHTML = ICO_SVG.download;
   renderHomeModules();
 }
 
@@ -1818,8 +1875,13 @@ function showPage(name) {
   closeUserMenu();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
+  const pageEl = document.getElementById('page-' + name);
+  if (!pageEl) return;
+  pageEl.classList.add('active');
   document.querySelectorAll(`[data-page="${name}"]`).forEach(b => b.classList.add('active'));
+  if (name === 'excel' || name === 'offline') {
+    document.querySelectorAll('[data-page="more"]').forEach(b => b.classList.add('active'));
+  }
   const title = PAGE_TITLES[name] || 'SCA';
   const mobileTitle = document.getElementById('mobile-title');
   const topbarTitle = document.getElementById('topbar-title');
@@ -1842,6 +1904,7 @@ function showPage(name) {
   if (name === 'schedules') loadSchedulesPage();
   if (name === 'dashboard') loadDashboard();
   if (name === 'excel') loadExcelPage();
+  if (name === 'more') applyNavPermissions();
   if (name === 'recursos') loadRecursosPage();
   if (name === 'accounts') loadAccountsPage();
   if (name === 'system') loadSystemPage();
@@ -3076,7 +3139,10 @@ async function loadSchedulesPage() {
             <p>Entrada ${s.entry_time} · Salida ${s.exit_time} · Almuerzo ${s.lunch_start}–${s.lunch_end}${scheduleToleranceLabel(s.grace_minutes, s.lunch_grace_minutes)}</p>
             <p style="font-size:12px;color:var(--muted)">Días laborables: ${workDaysLabel(s)}</p>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="editSchedule(${s.sede_id})">Editar</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="editSchedule(${s.sede_id})">Editar</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('schedule-sede').value=${s.sede_id};applySedeSchedule('inherit')">Aplicar a empleados</button>
+          </div>
         </div>`).join('');
     }
     renderHolidaysList(holidays);
@@ -3146,10 +3212,36 @@ async function seedPeruHolidays() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
-function editSchedule(sedeId) {
-  document.getElementById('schedule-sede').value = sedeId;
-  loadScheduleForm();
-  closeMobileMenu();
+async function editSchedule(sedeId) {
+  showPage('schedules');
+  try { await loadSchedulesPage(); } catch (e) { /* ignore */ }
+  const sel = document.getElementById('schedule-sede');
+  if (sel) sel.value = String(sedeId);
+  await loadScheduleForm();
+  document.getElementById('schedule-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function applySedeSchedule(mode) {
+  const sedeId = +document.getElementById('schedule-sede')?.value;
+  const sedeName = document.getElementById('schedule-sede')?.selectedOptions?.[0]?.text || 'esta sede';
+  if (!sedeId) return toast('Selecciona una sede', 'error');
+  const inherit = mode === 'inherit';
+  const ok = confirm(
+    inherit
+      ? `¿Aplicar el horario de "${sedeName}" a TODOS sus empleados?\nSe quitarán horarios personalizados de esa sede.`
+      : `¿Copiar el horario de "${sedeName}" como personalizado a TODOS sus empleados?`
+  );
+  if (!ok) return;
+  try {
+    await saveSchedule();
+    const r = await api(`/api/schedules/${sedeId}/apply-employees`, {
+      method: 'POST',
+      body: JSON.stringify({ mode }),
+    });
+    toast(r.message || 'Horario aplicado');
+    loadUsers();
+    loadSchedulesPage();
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 async function loadScheduleForm() {
@@ -3282,13 +3374,26 @@ async function testConnection() {
 async function loadSedes() {
   const el = document.getElementById('sedes-list');
   try {
-    const sedes = await api('/api/sedes');
+    const [sedes, schedules] = await Promise.all([api('/api/sedes'), api('/api/schedules')]);
+    const bySede = Object.fromEntries((schedules || []).map(s => [s.sede_id, s]));
     if (!sedes.length) { el.innerHTML = '<div class="empty">No hay sedes. Crea una arriba.</div>'; return; }
-    el.innerHTML = sedes.map(s => `
+    el.innerHTML = sedes.map(s => {
+      const sch = bySede[s.id];
+      const horario = sch ? `Horario ${sch.entry_time}–${sch.exit_time}` : 'Sin horario configurado';
+      const safe = (s.name || '').replace(/'/g, "\\'");
+      return `
       <div class="device-card">
-        <div class="info"><h4>${s.name}</h4><p>${s.devices_count} reloj(es) local · ${s.adms_count} remoto(s)</p></div>
-        <button class="btn btn-danger btn-sm" onclick="deleteSede(${s.id},'${s.name.replace(/'/g,"")}')">🗑</button>
-      </div>`).join('');
+        <div class="info">
+          <h4>${s.name}</h4>
+          <p>${s.devices_count} reloj(es) local · ${s.adms_count} remoto(s)</p>
+          <p style="font-size:12px;color:var(--muted);margin-top:4px">${horario}</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="editSchedule(${s.id})">⏰ Horario</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSede(${s.id},'${safe}')">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
   } catch (e) { el.innerHTML = `<div class="empty">${e.message}</div>`; }
 }
 
@@ -4248,6 +4353,7 @@ function userHorarioBadge(userId) {
 function userRowHtml(u) {
   const safeName = (u.name || '').replace(/'/g, "\\'");
   return `<tr>
+    <td><input type="checkbox" class="user-check" value="${u.user_id}" data-sede="${u.sede_id || ''}" onchange="updateUsersSelectedCount()"></td>
     <td><strong>${u.user_id}</strong></td>
     <td>${u.name || '—'}</td>
     <td><span class="badge badge-blue">${u.sede_name || 'Sin sede'}</span></td>
@@ -4260,14 +4366,66 @@ function userRowHtml(u) {
 function getFilteredUsers() {
   const q = (document.getElementById('users-search')?.value || '').trim().toLowerCase();
   const sedeId = document.getElementById('users-sede')?.value || '';
+  const horario = document.getElementById('users-horario')?.value || '';
+  const wrap = document.getElementById('users-search-wrap');
+  if (wrap) wrap.classList.toggle('has-value', !!q);
   return allUsersList.filter(u => {
     if (sedeId && String(u.sede_id || '') !== sedeId) return false;
+    if (horario === 'custom' && !employeeSchedulesMap[u.user_id]) return false;
+    if (horario === 'sede' && employeeSchedulesMap[u.user_id]) return false;
     if (!q) return true;
-    const id = String(u.user_id || '').toLowerCase();
-    const name = String(u.name || '').toLowerCase();
-    const sede = String(u.sede_name || '').toLowerCase();
-    return id.includes(q) || name.includes(q) || sede.includes(q);
+    const hay = [u.user_id, u.name, u.sede_name, u.device_name].map(v => String(v || '').toLowerCase());
+    return hay.some(v => v.includes(q));
   });
+}
+
+function onUsersSearchInput() {
+  filterUsers();
+}
+
+function clearUsersSearch() {
+  const el = document.getElementById('users-search');
+  if (el) el.value = '';
+  filterUsers();
+  el?.focus();
+}
+
+function selectedUserIds() {
+  return [...document.querySelectorAll('.user-check:checked')].map(el => el.value);
+}
+
+function updateUsersSelectedCount() {
+  const el = document.getElementById('users-selected-count');
+  const n = selectedUserIds().length;
+  if (el) el.textContent = n ? `${n} seleccionado(s)` : '';
+}
+
+function toggleSelectAllUsers(checked) {
+  document.querySelectorAll('.user-check').forEach(el => { el.checked = checked; });
+  updateUsersSelectedCount();
+}
+
+async function batchApplySelected(mode) {
+  const checks = [...document.querySelectorAll('.user-check:checked')];
+  const ids = checks.map(el => el.value);
+  if (!ids.length) return toast('Selecciona al menos un empleado', 'error');
+  const sedeIds = [...new Set(checks.map(el => el.dataset.sede).filter(Boolean))];
+  const sedeId = document.getElementById('users-sede')?.value || (sedeIds.length === 1 ? sedeIds[0] : '');
+  if (!sedeId) return toast('Filtra por una sede o selecciona empleados de una sola sede', 'error');
+  const ok = confirm(
+    mode === 'inherit'
+      ? `¿Aplicar el horario de la sede a ${ids.length} empleado(s) seleccionado(s)?`
+      : `¿Copiar el horario de la sede como personalizado a ${ids.length} empleado(s)?`
+  );
+  if (!ok) return;
+  try {
+    const r = await api(`/api/schedules/${sedeId}/apply-employees`, {
+      method: 'POST',
+      body: JSON.stringify({ mode, user_ids: ids }),
+    });
+    toast(r.message || 'Horario aplicado');
+    loadUsers();
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 function renderUsersTable(list) {
@@ -4276,8 +4434,9 @@ function renderUsersTable(list) {
   if (!list.length) {
     const q = document.getElementById('users-search')?.value?.trim();
     const sede = document.getElementById('users-sede')?.value;
-    tbody.innerHTML = `<tr><td colspan="6" class="empty">${q || sede ? 'Ningún empleado coincide con el filtro.' : 'Sin empleados. Usa Descarga Local o sincroniza un reloj.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">${q || sede ? 'Ningún empleado coincide con el filtro.' : 'Sin empleados. Usa Descarga Local o sincroniza un reloj.'}</td></tr>`;
     if (countEl) countEl.textContent = q || sede ? '0 resultados' : '';
+    updateUsersSelectedCount();
     return;
   }
   if (countEl) {
@@ -4285,6 +4444,9 @@ function renderUsersTable(list) {
     countEl.textContent = list.length === total ? `${total} empleado(s)` : `${list.length} de ${total}`;
   }
   tbody.innerHTML = list.map(userRowHtml).join('');
+  const allBox = document.getElementById('users-select-all');
+  if (allBox) allBox.checked = false;
+  updateUsersSelectedCount();
 }
 
 function renderUsersBySede(list) {
@@ -4313,10 +4475,11 @@ function renderUsersBySede(list) {
       </div>
       <div class="table-wrap" style="margin:0">
         <table>
-          <thead><tr><th>ID</th><th>Nombre</th><th>Reloj</th><th>Horario</th><th>Acciones</th></tr></thead>
+          <thead><tr><th></th><th>ID</th><th>Nombre</th><th>Reloj</th><th>Horario</th><th>Acciones</th></tr></thead>
           <tbody>${groups[sede].map(u => {
             const safeName = (u.name || '').replace(/'/g, "\\'");
             return `<tr>
+              <td><input type="checkbox" class="user-check" value="${u.user_id}" data-sede="${u.sede_id || ''}" onchange="updateUsersSelectedCount()"></td>
               <td><strong>${u.user_id}</strong></td>
               <td>${u.name || '—'}</td>
               <td style="font-size:12px;color:var(--muted)">${u.device_name || '—'}</td>
@@ -4349,7 +4512,7 @@ async function loadUsers() {
     });
     filterUsers();
   } catch (e) {
-    document.getElementById('users-tbody').innerHTML = `<tr><td colspan="6">${e.message}</td></tr>`;
+    document.getElementById('users-tbody').innerHTML = `<tr><td colspan="7">${e.message}</td></tr>`;
   }
 }
 

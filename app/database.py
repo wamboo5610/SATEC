@@ -977,6 +977,42 @@ def delete_employee_schedule(user_id: str):
         conn.execute("DELETE FROM employee_schedules WHERE user_id=?", (str(user_id),))
 
 
+def apply_sede_schedule_to_employees(sede_id: int, mode: str = "inherit", user_ids: list | None = None) -> dict:
+    users = get_users(sede_id=sede_id)
+    if user_ids:
+        wanted = {str(uid) for uid in user_ids}
+        users = [u for u in users if str(u.get("user_id")) in wanted]
+    ids = [str(u["user_id"]) for u in users]
+    if not ids:
+        return {"affected": 0, "mode": mode}
+    if mode == "inherit":
+        with get_conn() as conn:
+            placeholders = ",".join("?" * len(ids))
+            conn.execute(
+                f"DELETE FROM employee_schedules WHERE user_id IN ({placeholders})",
+                ids,
+            )
+        return {"affected": len(ids), "mode": "inherit"}
+    if mode == "copy":
+        schedule = get_work_schedule(sede_id)
+        if not schedule:
+            raise ValueError("La sede no tiene un horario configurado")
+        for user in users:
+            save_employee_schedule(
+                user["user_id"],
+                user.get("name"),
+                entry_time=schedule.get("entry_time"),
+                exit_time=schedule.get("exit_time"),
+                lunch_start=schedule.get("lunch_start"),
+                lunch_end=schedule.get("lunch_end"),
+                grace_minutes=schedule.get("grace_minutes") or 0,
+                lunch_grace_minutes=schedule.get("lunch_grace_minutes") or 0,
+                notes=f"Asignado por lote desde sede {schedule.get('sede_name') or sede_id}",
+            )
+        return {"affected": len(ids), "mode": "copy"}
+    raise ValueError("Modo inválido")
+
+
 # --- Subsanaciones de marcaciones (RRHH) ---
 def get_punch_remedies(date_from=None, date_to=None, user_id=None):
     clauses, params = [], []
