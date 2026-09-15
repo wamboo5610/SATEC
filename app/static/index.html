@@ -934,7 +934,7 @@
         <strong>Carpetas:</strong> elige la carpeta del <strong>listado RRHH</strong> y la de los <strong>reportes del reloj</strong>
         (por defecto en <code>Downloads\recursos\lista</code> y <code>Downloads\recursos\reportes</code>).
         Empareja por <strong>DNI</strong> y calcula tardanzas con las <strong>mismas reglas de SATEC</strong>:
-        horario por sede (entrada, almuerzo, tolerancias), días laborables, feriados, ventanas de marcación y
+        horario por sede o personalizado (incluye turnos rotativos de serenos y jornadas de otro régimen).
         <strong>20 min de tolerancia mensual</strong> por empleado.
         <span id="rec-schedules-note" style="display:block;margin-top:8px"></span>
       </div>
@@ -980,6 +980,10 @@
         <div class="btn-row">
           <button class="btn btn-primary" onclick="calculateRecursosTardiness()">⏰ Calcular tardanzas</button>
           <button class="btn btn-success" onclick="exportRecursosTardiness()">📊 Descargar Excel</button>
+          <label class="btn btn-outline" style="cursor:pointer">
+            📥 Importar rol de turnos
+            <input type="file" accept=".xlsx,.xls" style="display:none" onchange="importRolTurnos(this)">
+          </label>
           <button class="btn btn-outline" onclick="loadRecursosPage()">🔄 Actualizar carpetas</button>
         </div>
       </div>
@@ -1110,8 +1114,14 @@
       <div class="card">
         <h3>Horarios personalizados por empleado</h3>
         <p style="font-size:13px;color:var(--muted);margin-bottom:14px">
-          Estos empleados tienen un horario distinto al de su sede. El cálculo de tardanzas usa su horario individual.
+          Estos empleados tienen un horario distinto al de su sede, o varios turnos (serenos). El cálculo usa el turno que mejor calza con la primera marcación del día.
         </p>
+        <div class="btn-row" style="margin-bottom:12px">
+          <label class="btn btn-outline btn-sm" style="cursor:pointer">
+            📥 Importar rol de turnos (Excel)
+            <input type="file" id="rol-turnos-file" accept=".xlsx,.xls" style="display:none" onchange="importRolTurnos(this)">
+          </label>
+        </div>
         <div id="employee-schedules-list" class="empty">Cargando...</div>
       </div>
     </section>
@@ -1170,7 +1180,7 @@
     <section class="page" id="page-users">
       <div class="page-header">
         <h2>Empleados</h2>
-        <p>Usuarios registrados en el reloj biométrico, organizados por sede. Puedes asignar horario personalizado a quienes trabajan en turno distinto.</p>
+        <p>Usuarios del reloj, por sede. Asigna horario personalizado o varios turnos (serenos / otro régimen).</p>
       </div>
       <div class="card">
         <div class="search-bar">
@@ -1357,7 +1367,14 @@
   <div class="modal-card wide">
     <h3 id="emp-sch-title">Gestionar horario</h3>
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px" id="emp-sch-subtitle">—</p>
-    <div class="grid-2">
+    <div class="alert alert-info" style="margin-bottom:12px">
+      Un horario (administrativo) o varios turnos (serenos). Si hay varios, SATEC usa el que más se acerca a la primera marcación del día.
+    </div>
+    <div id="emp-sch-shifts"></div>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn btn-outline btn-sm" type="button" onclick="addEmployeeShiftRow()">➕ Agregar turno</button>
+    </div>
+    <div class="grid-2" style="display:none">
       <div class="form-group"><label>Hora de entrada</label><input type="time" id="emp-sch-entry" value="08:00"></div>
       <div class="form-group"><label>Hora de salida</label><input type="time" id="emp-sch-exit" value="17:00"></div>
       <div class="form-group"><label>Inicio almuerzo</label><input type="time" id="emp-sch-lunch-start" value="12:00"></div>
@@ -2099,8 +2116,78 @@ document.addEventListener('click', (e) => {
   );
 });
 
+function emptyShiftRow(s = {}) {
+  return {
+    label: s.label || '',
+    entry_time: (s.entry_time || '08:00').slice(0, 5),
+    exit_time: (s.exit_time || '17:00').slice(0, 5),
+    lunch_start: (s.lunch_start || '').slice(0, 5),
+    lunch_end: (s.lunch_end || '').slice(0, 5),
+    schedule_kind: s.schedule_kind || (s.lunch_start && s.lunch_end ? 'split' : 'block'),
+  };
+}
+
+function renderEmployeeShiftRows(shifts) {
+  const el = document.getElementById('emp-sch-shifts');
+  if (!el) return;
+  const rows = shifts.length ? shifts : [emptyShiftRow()];
+  el.innerHTML = rows.map((s, i) => `
+    <div class="card" style="padding:12px;margin-bottom:10px" data-shift-row>
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px">
+        <strong>Turno ${i + 1}</strong>
+        ${rows.length > 1 ? `<button class="btn btn-outline btn-sm" type="button" onclick="removeEmployeeShiftRow(${i})">Quitar</button>` : ''}
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Nombre</label><input data-shift-field="label" value="${(s.label || '').replace(/"/g, '&quot;')}" placeholder="Ej: Turno noche"></div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select data-shift-field="schedule_kind">
+            <option value="split" ${s.schedule_kind === 'split' ? 'selected' : ''}>Partido (con almuerzo)</option>
+            <option value="block" ${s.schedule_kind === 'block' ? 'selected' : ''}>Continuo (entrada y salida)</option>
+            <option value="overnight" ${s.schedule_kind === 'overnight' ? 'selected' : ''}>Nocturno (cruza medianoche)</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Entrada</label><input type="time" data-shift-field="entry_time" value="${s.entry_time || '08:00'}"></div>
+        <div class="form-group"><label>Salida</label><input type="time" data-shift-field="exit_time" value="${s.exit_time || '17:00'}"></div>
+        <div class="form-group"><label>Inicio almuerzo</label><input type="time" data-shift-field="lunch_start" value="${s.lunch_start || ''}"></div>
+        <div class="form-group"><label>Regreso almuerzo</label><input type="time" data-shift-field="lunch_end" value="${s.lunch_end || ''}"></div>
+      </div>
+    </div>`).join('');
+}
+
+function collectEmployeeShifts() {
+  return [...document.querySelectorAll('#emp-sch-shifts [data-shift-row]')].map(row => {
+    const val = name => row.querySelector(`[data-shift-field="${name}"]`)?.value || '';
+    const kind = val('schedule_kind') || 'split';
+    const lunchStart = kind === 'split' ? val('lunch_start') : '';
+    const lunchEnd = kind === 'split' ? val('lunch_end') : '';
+    return {
+      label: val('label').trim(),
+      entry_time: val('entry_time') || '08:00',
+      exit_time: val('exit_time') || '17:00',
+      lunch_start: lunchStart,
+      lunch_end: lunchEnd,
+      schedule_kind: kind,
+    };
+  });
+}
+
+function addEmployeeShiftRow() {
+  const shifts = collectEmployeeShifts();
+  shifts.push(emptyShiftRow({ entry_time: '15:00', exit_time: '23:00', schedule_kind: 'block', label: `Turno ${shifts.length + 1}` }));
+  renderEmployeeShiftRows(shifts);
+}
+
+function removeEmployeeShiftRow(index) {
+  const shifts = collectEmployeeShifts().filter((_, i) => i !== index);
+  renderEmployeeShiftRows(shifts.length ? shifts : [emptyShiftRow()]);
+}
+
 function fillEmployeeScheduleForm(schedule) {
   const s = schedule || {};
+  const extras = Array.isArray(s.extra_shifts) ? s.extra_shifts : [];
+  const primary = emptyShiftRow(s);
+  renderEmployeeShiftRows([primary, ...extras.map(emptyShiftRow)]);
   document.getElementById('emp-sch-entry').value = s.entry_time || '08:00';
   document.getElementById('emp-sch-exit').value = s.exit_time || '17:00';
   document.getElementById('emp-sch-lunch-start').value = s.lunch_start || '12:00';
@@ -2112,8 +2199,9 @@ function fillEmployeeScheduleForm(schedule) {
   if (graceDetails) graceDetails.open = (+(s.grace_minutes || 0) > 0 || +(s.lunch_grace_minutes || 0) > 0);
   const hasCustom = !!employeeSchedulesMap[employeeScheduleEditing?.user_id];
   document.getElementById('emp-sch-remove-btn').style.display = hasCustom ? 'inline-flex' : 'none';
+  const n = 1 + extras.length;
   document.getElementById('emp-sch-status').textContent = hasCustom
-    ? `Horario personalizado activo · actualizado: ${s.updated_at || '—'}`
+    ? `${n > 1 ? n + ' turnos rotativos' : 'Horario personalizado'} · actualizado: ${s.updated_at || '—'}`
     : 'Sin horario personalizado. Se usará el horario de la sede hasta que guardes uno.';
 }
 
@@ -2138,12 +2226,17 @@ function closeEmployeeScheduleModal() {
 
 async function saveEmployeeSchedule() {
   if (!employeeScheduleEditing) return;
+  const shifts = collectEmployeeShifts();
+  if (!shifts.length) return toast('Agrega al menos un turno', 'error');
+  const primary = shifts[0];
   const payload = {
     user_name: employeeScheduleEditing.user_name || null,
-    entry_time: document.getElementById('emp-sch-entry').value,
-    exit_time: document.getElementById('emp-sch-exit').value,
-    lunch_start: document.getElementById('emp-sch-lunch-start').value,
-    lunch_end: document.getElementById('emp-sch-lunch-end').value,
+    entry_time: primary.entry_time,
+    exit_time: primary.exit_time,
+    lunch_start: primary.lunch_start || '',
+    lunch_end: primary.lunch_end || '',
+    schedule_kind: primary.schedule_kind,
+    extra_shifts: shifts.slice(1),
     grace_minutes: +document.getElementById('emp-sch-grace').value,
     lunch_grace_minutes: +document.getElementById('emp-sch-lunch-grace').value,
     notes: document.getElementById('emp-sch-notes').value.trim() || null,
@@ -2183,7 +2276,7 @@ function renderEmployeeSchedulesList(schedules) {
     <div class="device-card" style="margin-bottom:8px">
       <div class="info">
         <h4>${s.user_name || s.user_id}</h4>
-        <p>ID ${s.user_id} · Entrada ${s.entry_time} · Almuerzo ${s.lunch_start}–${s.lunch_end}${scheduleToleranceLabel(s.grace_minutes, s.lunch_grace_minutes)}</p>
+        <p>ID ${s.user_id} · ${(s.extra_shifts && s.extra_shifts.length) ? ((s.extra_shifts.length + 1) + ' turnos rotativos · ') : ''}Entrada ${s.entry_time} · Salida ${s.exit_time}${s.lunch_start && s.lunch_end ? ` · Almuerzo ${s.lunch_start}–${s.lunch_end}` : ''}${scheduleToleranceLabel(s.grace_minutes, s.lunch_grace_minutes)}</p>
         ${s.notes ? `<p style="margin-top:4px">${s.notes}</p>` : ''}
       </div>
       <button class="btn btn-outline btn-sm" onclick="openEmployeeScheduleModal('${s.user_id}', '${(s.user_name || '').replace(/'/g, "\\'")}')">Editar</button>
@@ -4345,9 +4438,28 @@ function setUsersView(mode) {
 
 function userHorarioBadge(userId) {
   const custom = employeeSchedulesMap[userId];
-  return custom
-    ? `<span class="badge badge-orange">Personalizado ${custom.entry_time}</span>`
-    : '<span class="badge badge-gray">Horario de sede</span>';
+  if (!custom) return '<span class="badge badge-gray">Horario de sede</span>';
+  const extra = Array.isArray(custom.extra_shifts) ? custom.extra_shifts.length : 0;
+  if (extra) return `<span class="badge badge-orange">${extra + 1} turnos</span>`;
+  return `<span class="badge badge-orange">${custom.entry_time}–${custom.exit_time}</span>`;
+}
+
+async function importRolTurnos(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    toast('Importando rol de turnos...');
+    const res = await fetch('/api/employee-schedules/import-rol', { method: 'POST', credentials: 'same-origin', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || 'No se pudo importar');
+    toast(data.message || 'Rol importado');
+    if (data.unmatched_count) toast(`${data.unmatched_count} persona(s) del Excel no coincidieron con el reloj`, 'error');
+    loadUsers();
+    if (document.getElementById('page-schedules')?.classList.contains('active')) loadSchedulesPage();
+  } catch (e) { toast(e.message, 'error'); }
+  input.value = '';
 }
 
 function userRowHtml(u) {

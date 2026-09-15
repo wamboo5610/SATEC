@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from datetime import datetime, timedelta
+import json
 
 from .calendar_rules import classify_day, merge_work_days
 
@@ -200,6 +201,14 @@ def classify_punch_slot_by_time(timestamp: str, schedule: dict | None = None) ->
     if not dt:
         return None
     minutes = dt.hour * 60 + dt.minute
+    if schedule:
+        kind = schedule_kind(schedule)
+        if kind in ("block", "overnight"):
+            entry = parse_hhmm_to_minutes(schedule.get("entry_time") or "08:00")
+            exit_time = parse_hhmm_to_minutes(schedule.get("exit_time") or "17:00")
+            d_entry = min(abs(minutes - entry), 1440 - abs(minutes - entry))
+            d_exit = min(abs(minutes - exit_time), 1440 - abs(minutes - exit_time))
+            return "entrada" if d_entry <= d_exit else "salida"
     for slot, (start, end) in get_punch_windows(schedule).items():
         if start <= minutes <= end:
             return slot
@@ -294,11 +303,85 @@ def minutes_late(actual: datetime, expected: datetime) -> int:
     return max(0, int(delta))
 
 
+def extra_shifts_of(schedule: dict | None) -> list[dict]:
+    raw = (schedule or {}).get("extra_shifts") or []
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            raw = []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def schedule_kind(schedule: dict | None) -> str:
+    sched = schedule or {}
+    kind = str(sched.get("schedule_kind") or sched.get("kind") or "").strip().lower()
+    if kind in ("block", "overnight", "split"):
+        return kind
+    entry = parse_hhmm_to_minutes(sched.get("entry_time") or "08:00")
+    exit_time = parse_hhmm_to_minutes(sched.get("exit_time") or "17:00")
+    if exit_time < entry:
+        return "overnight"
+    lunch_start = str(sched.get("lunch_start") or "").strip()
+    lunch_end = str(sched.get("lunch_end") or "").strip()
+    if not lunch_start or not lunch_end or lunch_start == lunch_end:
+        return "block"
+    return "split"
+
+
+def candidate_shifts(schedule: dict | None) -> list[dict]:
+    if not schedule:
+        return [dict(DEFAULT_SCHEDULE)]
+    extras = extra_shifts_of(schedule)
+    if not extras:
+        return [dict(schedule)]
+    shifts = [dict(schedule)]
+    for extra in extras:
+        merged = dict(schedule)
+        merged.update(extra)
+        shifts.append(merged)
+    return shifts
+
+
+def pick_shift_for_punches(marcaciones: list[dict], schedule: dict | None) -> dict:
+    candidates = candidate_shifts(schedule)
+    if len(candidates) == 1:
+        return candidates[0]
+    first = None
+    for item in marcaciones:
+        dt = parse_timestamp(item.get("timestamp") or "")
+        if dt:
+            minutes = dt.hour * 60 + dt.minute
+            first = minutes if first is None else min(first, minutes)
+    if first is None:
+        return candidates[0]
+
+    def _score(shift: dict) -> int:
+        entry = parse_hhmm_to_minutes(shift.get("entry_time") or "08:00")
+        diff = abs(first - entry)
+        return min(diff, 1440 - diff)
+
+    return min(candidates, key=_score)
+
+
+def expected_slots_for_schedule(schedule: dict | None) -> tuple[tuple[str, str], ...]:
+    kind = schedule_kind(schedule)
+    if kind in ("block", "overnight"):
+        return (("Entrada", "entrada"), ("Salida", "salida"))
+    return EXPECTED_PUNCH_SLOTS
+
+
 def normalize_schedule(schedule: dict | None) -> dict:
     base = dict(DEFAULT_SCHEDULE)
     base.update(merge_work_days(schedule))
     if schedule:
         base.update({k: schedule[k] for k in base if k in schedule and schedule[k] is not None})
+        if schedule.get("schedule_kind"):
+            base["schedule_kind"] = schedule["schedule_kind"]
+        if schedule.get("label"):
+            base["label"] = schedule["label"]
+        if schedule.get("extra_shifts") is not None:
+            base["extra_shifts"] = schedule["extra_shifts"]
     return base
 
 
@@ -329,12 +412,15 @@ def analyze_punch_completeness(
     salida: str | None = None,
     subsanados: set[str] | None = None,
     subsanaciones: list[dict] | None = None,
+    expected_slots: tuple[tuple[str, str], ...] | None = None,
 ) -> dict:
-    """Evalúa si el empleado tiene las 4 marcaciones diarias esperadas."""
+    """Evalúa si el empleado tiene las marcaciones diarias esperadas."""
+    slots_def = expected_slots or EXPECTED_PUNCH_SLOTS
+    expected_count = len(slots_def)
     total = len(marcaciones)
     base = {
         "total_marcaciones": total,
-        "marcaciones_esperadas": EXPECTED_PUNCH_COUNT if dia_laborable else 0,
+        "marcaciones_esperadas": expected_count if dia_laborable else 0,
         "marcaciones_faltantes": [],
         "marcaciones_faltantes_slots": [],
         "marcaciones_extras": 0,
@@ -352,12 +438,12 @@ def analyze_punch_completeness(
         "entrada_almuerzo": entrada_almuerzo,
         "salida": salida,
     }
-    missing_keys = [key for _label, key in EXPECTED_PUNCH_SLOTS if not slots.get(key)]
+    missing_keys = [key for _label, key in slots_def if not slots.get(key)]
     subsanados = subsanados or set()
     pending_keys = [key for key in missing_keys if key not in subsanados]
-    pending = [SLOT_KEY_TO_LABEL[key] for key in pending_keys]
-    covered = [SLOT_KEY_TO_LABEL[key] for key in missing_keys if key in subsanados]
-    extras = max(0, total - EXPECTED_PUNCH_COUNT)
+    pending = [SLOT_KEY_TO_LABEL.get(key, key) for key in pending_keys]
+    covered = [SLOT_KEY_TO_LABEL.get(key, key) for key in missing_keys if key in subsanados]
+    extras = max(0, total - expected_count)
     base["marcaciones_faltantes"] = pending
     base["marcaciones_faltantes_slots"] = pending_keys
     base["marcaciones_extras"] = extras
@@ -390,13 +476,13 @@ def analyze_punch_completeness(
         return base
 
     if pending_keys:
-        if total == 3:
+        if total == expected_count - 1 and expected_count >= 2:
             faltantes_txt = ", ".join(pending)
-            base["estado_marcaciones"] = "Tres marcaciones"
+            base["estado_marcaciones"] = "Tres marcaciones" if expected_count == 4 else "Incompleto"
             base["puede_subsanar"] = True
             if len(pending_keys) == 1:
                 base["observacion_marcaciones"] = (
-                    f"Tiene 3 de 4 marcaciones — falta {pending[0]} — "
+                    f"Tiene {total} de {expected_count} marcaciones — falta {pending[0]} — "
                     "RRHH puede subsanar con papeleta o justificación"
                 )
             else:
@@ -470,6 +556,7 @@ def _attach_punch_analysis(
         dia_laborable=dia_laborable,
         subsanados=subsanados,
         subsanaciones=subsanaciones,
+        expected_slots=expected_slots_for_schedule(schedule),
         **slots,
     )
     result.update(punch)
@@ -486,9 +573,12 @@ def enrich_with_schedule(
 ) -> dict:
     """Calcula tardanza de entrada y regreso de almuerzo según horario de la sede."""
     result = dict(person)
-    sched = normalize_schedule(schedule)
-    work_sched = work_day_schedule or schedule
     marcaciones = result.pop("marcaciones", [])
+    chosen = pick_shift_for_punches(marcaciones, schedule)
+    sched = normalize_schedule(chosen)
+    work_sched = work_day_schedule or chosen
+    result["horario_turno"] = chosen.get("label") or f"{sched.get('entry_time')}–{sched.get('exit_time')}"
+    result["schedule_kind"] = schedule_kind(chosen)
     date = extract_date(result.get("entrada") or "")
     if not date and marcaciones:
         date = extract_date(marcaciones[0].get("timestamp", ""))
@@ -555,7 +645,13 @@ def enrich_with_schedule(
     tardanza_almuerzo = 0
 
     afternoon_deadline = resolve_afternoon_entry_deadline(sched)
-    if entrada_almuerzo:
+    kind = schedule_kind(sched)
+    if kind in ("block", "overnight"):
+        entrada_almuerzo = None
+        salida_almuerzo = None
+        tardanza_almuerzo = 0
+        afternoon_deadline = ""
+    elif entrada_almuerzo:
         entrada_alm_dt = parse_timestamp(entrada_almuerzo)
         lunch_expected = time_on_date(date, afternoon_deadline) + timedelta(
             minutes=int(sched["lunch_grace_minutes"])
@@ -649,6 +745,42 @@ def build_daily_summary(
             p["salida"] = ts
         p["marcaciones"].append({"timestamp": ts, "tipo": tipo, "slot": slot})
 
+    overnight_users = set()
+    for uid, rec in schedules_by_user_id.items():
+        for shift in candidate_shifts(rec):
+            if schedule_kind(shift) == "overnight":
+                overnight_users.add(str(uid))
+    for uid, day in list(by_person.keys()):
+        if uid not in overnight_users:
+            continue
+        try:
+            nxt = (datetime.strptime(day, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+        current = by_person.get((uid, day))
+        following = by_person.get((uid, nxt))
+        if not current or not following:
+            continue
+
+        def _mins(ts: str) -> int:
+            parsed = parse_timestamp(ts)
+            return parsed.hour * 60 + parsed.minute if parsed else 0
+
+        late = any(_mins(m.get("timestamp", "")) >= 18 * 60 for m in current["marcaciones"])
+        early = any(_mins(m.get("timestamp", "")) < 12 * 60 for m in following["marcaciones"])
+        if not (late and early):
+            continue
+        current["marcaciones"].extend(
+            [m for m in following["marcaciones"] if _mins(m.get("timestamp", "")) < 12 * 60]
+        )
+        current["total"] = len(current["marcaciones"])
+        leftover = [m for m in following["marcaciones"] if _mins(m.get("timestamp", "")) >= 12 * 60]
+        if leftover:
+            following["marcaciones"] = leftover
+            following["total"] = len(leftover)
+        else:
+            by_person.pop((uid, nxt), None)
+
     summary = []
     for person in sorted(by_person.values(), key=lambda x: (x.get("work_date", ""), x.get("user_name") or x["user_id"])):
         sede_id = person.get("sede_id") or sede_name_to_id.get(person.get("sede_name"))
@@ -666,7 +798,7 @@ def build_daily_summary(
             holiday_dates=holiday_dates,
             remedies_lookup=remedies_lookup,
         )
-        row["horario_aplicado"] = horario_tipo
+        row["horario_aplicado"] = "rotativo" if extra_shifts_of(schedule) else horario_tipo
         summary.append(row)
     return summary
 

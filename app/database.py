@@ -275,6 +275,11 @@ def _migrate(conn):
     ]:
         if col not in wcols:
             conn.execute(f"ALTER TABLE work_schedules ADD COLUMN {col} INTEGER NOT NULL DEFAULT {default}")
+    ecols = {r[1] for r in conn.execute("PRAGMA table_info(employee_schedules)").fetchall()}
+    if "schedule_kind" not in ecols:
+        conn.execute("ALTER TABLE employee_schedules ADD COLUMN schedule_kind TEXT NOT NULL DEFAULT 'split'")
+    if "extra_shifts" not in ecols:
+        conn.execute("ALTER TABLE employee_schedules ADD COLUMN extra_shifts TEXT")
 
     if "holidays" not in tables:
         conn.execute("""
@@ -910,7 +915,7 @@ def get_employee_schedules():
         rows = conn.execute(
             "SELECT * FROM employee_schedules ORDER BY COALESCE(user_name, user_id), user_id"
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [_decode_employee_schedule(dict(r)) for r in rows]
 
 
 def get_schedules_by_user_id():
@@ -923,15 +928,34 @@ def get_employee_schedule(user_id: str):
             "SELECT * FROM employee_schedules WHERE user_id=?",
             (str(user_id),),
         ).fetchone()
-        return dict(row) if row else None
+        return _decode_employee_schedule(dict(row)) if row else None
+
+
+def _decode_employee_schedule(row: dict) -> dict:
+    data = dict(row)
+    raw = data.get("extra_shifts")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            import json
+            data["extra_shifts"] = json.loads(raw)
+        except Exception:
+            data["extra_shifts"] = []
+    elif not raw:
+        data["extra_shifts"] = []
+    return data
 
 
 def save_employee_schedule(user_id, user_name=None, **kwargs):
     allowed = {
         "entry_time", "exit_time", "lunch_start", "lunch_end",
         "grace_minutes", "lunch_grace_minutes", "notes",
+        "schedule_kind", "extra_shifts",
     }
     fields = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if "extra_shifts" in fields:
+        import json
+        value = fields["extra_shifts"]
+        fields["extra_shifts"] = json.dumps(value if isinstance(value, list) else [], ensure_ascii=False)
     fields["updated_at"] = datetime.now().isoformat()
     if user_name is not None:
         fields["user_name"] = user_name
@@ -955,18 +979,20 @@ def save_employee_schedule(user_id, user_name=None, **kwargs):
         conn.execute(
             """INSERT INTO employee_schedules
                (user_id, user_name, entry_time, exit_time, lunch_start, lunch_end,
-                grace_minutes, lunch_grace_minutes, notes, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                grace_minutes, lunch_grace_minutes, notes, schedule_kind, extra_shifts, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 uid,
                 user_name or "",
                 defaults["entry_time"],
                 defaults["exit_time"],
-                defaults["lunch_start"],
-                defaults["lunch_end"],
+                defaults.get("lunch_start") or "",
+                defaults.get("lunch_end") or "",
                 defaults["grace_minutes"],
                 defaults["lunch_grace_minutes"],
                 defaults.get("notes"),
+                defaults.get("schedule_kind") or "split",
+                defaults.get("extra_shifts") or "[]",
                 defaults["updated_at"],
             ),
         )

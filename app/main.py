@@ -28,6 +28,7 @@ from . import recursos_tardiness as recursos
 from . import offline_download as offdl
 from . import backup as bak
 from . import updater as upd
+from . import shift_import as shimp
 from .paths import get_data_dir, IS_VERCEL, is_desktop, get_listen_port, assets_dir, get_reportes_dir
 from .database import DB_PATH
 from .auth import AUTH_PATH
@@ -245,6 +246,8 @@ class EmployeeScheduleUpdate(BaseModel):
     grace_minutes: int = 0
     lunch_grace_minutes: int = 0
     notes: str | None = None
+    schedule_kind: str | None = None
+    extra_shifts: list[dict] | None = None
 
 
 @app.post("/api/auth/login")
@@ -529,6 +532,34 @@ def update_employee_schedule_page(user_id: str, data: EmployeeScheduleUpdate):
 def remove_employee_schedule_page(user_id: str):
     db.delete_employee_schedule(user_id)
     return {"message": "Horario personalizado eliminado. Se usará el horario de la sede."}
+
+
+@app.post("/api/employee-schedules/import-rol")
+async def import_rol_turnos(
+    file: UploadFile | None = File(None),
+    use_bundled: bool = Form(False),
+):
+    payload = b""
+    if file and file.filename:
+        payload = await file.read()
+    elif use_bundled:
+        path = shimp.default_rol_path()
+        if not path.exists():
+            raise HTTPException(404, "No se encontró el Excel de rol de turnos en recursos/")
+        payload = path.read_bytes()
+    else:
+        raise HTTPException(400, "Suba el Excel de rol de turnos")
+    try:
+        result = shimp.apply_rol_turnos(payload)
+    except Exception as exc:
+        raise HTTPException(400, f"No se pudo leer el rol de turnos: {exc}")
+    return {
+        "message": (
+            f"Se aplicó el rol a {result['applied']} empleado(s) "
+            f"({result['rotating']} con turnos rotativos)."
+        ),
+        **result,
+    }
 
 
 def _schedule_for_excel(sede_id: int | None) -> tuple[dict | None, str]:
