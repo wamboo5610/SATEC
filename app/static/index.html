@@ -4583,7 +4583,7 @@ function userRowHtml(u) {
     <td><strong>${u.user_id}</strong></td>
     <td>${u.dni || u.user_id}</td>
     <td>${u.name || '—'}</td>
-    <td><span class="badge badge-blue">${u.sede_name || 'Sin sede'}</span></td>
+    <td><span class="badge badge-blue">${u.sede_name || 'Sin sede'}</span>${(u.other_clocks && u.other_clocks.length) ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">También en ${u.other_clocks.map(c => c.sede || c.device).filter(Boolean).join(', ')}</div>` : ''}</td>
     <td style="font-size:12px;color:var(--muted)">${u.device_name || '—'}</td>
     <td>${userHorarioBadge(u.user_id, u.sede_id)}</td>
     <td style="white-space:nowrap">

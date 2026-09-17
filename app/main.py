@@ -1503,9 +1503,9 @@ def list_users(device_serial: str | None = None, sede_id: int | None = None):
     for u in users:
         row = dict(u)
         dev = device_map.get(row.get("device_serial") or "", {})
-        row["sede_name"] = row.get("profile_sede_name") or dev.get("sede_name", "Sin sede")
-        row["sede_id"] = row.get("profile_sede_id") or dev.get("sede_id")
-        row["device_name"] = dev.get("device_name", row.get("device_serial") or "—")
+        row["sede_name"] = row.get("sede_name") or row.get("profile_sede_name") or dev.get("sede_name", "Sin sede")
+        row["sede_id"] = row.get("sede_id") or row.get("profile_sede_id") or dev.get("sede_id")
+        row["device_name"] = row.get("device_name") or dev.get("device_name", row.get("device_serial") or "—")
         row["dni"] = row.get("dni") or row.get("user_id")
         row["regimen"] = row.get("regimen") or "sin_regimen"
         row["regimen_label"] = row.get("regimen_label") or "Sin régimen"

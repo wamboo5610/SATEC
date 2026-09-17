@@ -751,25 +751,35 @@ def upsert_users(users, device_serial=None):
     return len(rows)
 
 
+def _sede_rank(sede_name: str, profile_sede_id=None, row_sede_id=None) -> int:
+    if profile_sede_id and row_sede_id and int(profile_sede_id) == int(row_sede_id):
+        return 100
+    name = (sede_name or "").lower()
+    if "principal" in name:
+        return 90
+    if "palacio" in name:
+        return 80
+    if "terminal" in name:
+        return 10
+    return 40
+
+
 def get_users(device_serial=None, sede_id=None):
     with get_conn() as conn:
-        if sede_id:
-            serials = get_serials_for_filters(sede_id=sede_id)
-            if not serials:
-                return []
-            ph = ",".join("?" * len(serials))
-            rows = conn.execute(f"SELECT * FROM users_cache WHERE device_serial IN ({ph}) ORDER BY name", serials).fetchall()
-        elif device_serial:
-            rows = conn.execute("SELECT * FROM users_cache WHERE device_serial=?", (device_serial,)).fetchall()
+        if device_serial:
+            rows = conn.execute(
+                "SELECT * FROM users_cache WHERE device_serial=? ORDER BY name",
+                (device_serial,),
+            ).fetchall()
         else:
             rows = conn.execute("SELECT * FROM users_cache ORDER BY name").fetchall()
         users = [dict(r) for r in rows]
     profiles = get_employee_profiles_map()
     sedes = {s["id"]: s["name"] for s in get_sedes()}
+    device_map = get_device_serial_map()
     for user in users:
-        profile = profiles.get(str(user.get("user_id")))
-        if not profile:
-            continue
+        uid = str(user.get("user_id") or "")
+        profile = profiles.get(uid) or {}
         if profile.get("display_name"):
             user["name"] = profile["display_name"]
         if profile.get("dni"):
@@ -780,6 +790,39 @@ def get_users(device_serial=None, sede_id=None):
         if profile.get("regimen"):
             user["regimen"] = profile["regimen"]
             user["regimen_label"] = al.REGIMEN_LABELS.get(profile["regimen"], profile["regimen"])
+        dev = device_map.get(user.get("device_serial") or "", {})
+        user["device_name"] = dev.get("device_name") or user.get("device_serial") or "—"
+        user["sede_id"] = user.get("profile_sede_id") or dev.get("sede_id")
+        user["sede_name"] = user.get("profile_sede_name") or dev.get("sede_name") or "Sin sede"
+        user["_rank"] = _sede_rank(dev.get("sede_name") or user.get("sede_name"), user.get("profile_sede_id"), dev.get("sede_id"))
+        user["_device_sede"] = dev.get("sede_name") or user.get("sede_name")
+    if not device_serial:
+        best: dict[str, dict] = {}
+        for user in users:
+            uid = str(user.get("user_id") or "")
+            if not uid:
+                continue
+            prev = best.get(uid)
+            clock = {"device": user.get("device_name"), "sede": user.get("_device_sede")}
+            if not prev or user["_rank"] > prev["_rank"]:
+                others = list((prev or {}).get("other_clocks") or [])
+                if prev:
+                    others.append({"device": prev.get("device_name"), "sede": prev.get("_device_sede")})
+                user["other_clocks"] = others
+                if user.get("profile_sede_id"):
+                    user["sede_id"] = user["profile_sede_id"]
+                    user["sede_name"] = user.get("profile_sede_name") or user["sede_name"]
+                best[uid] = user
+            else:
+                others = list(prev.get("other_clocks") or [])
+                others.append(clock)
+                prev["other_clocks"] = others
+        users = list(best.values())
+        for user in users:
+            user.pop("_rank", None)
+            user.pop("_device_sede", None)
+    if sede_id:
+        users = [u for u in users if str(u.get("sede_id") or "") == str(sede_id)]
     return users
 
 
@@ -1441,6 +1484,7 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
     data = get_monthly_tardiness_report(year, month, sede_id=sede_id, user_id=user_id)
     emp_schedules = get_schedules_by_user_id()
     profiles = get_employee_profiles_map()
+    sede_names = {s["id"]: s["name"] for s in get_sedes()}
     wanted = (regimen or "").strip().lower()
     details = list(data.get("details") or [])
     persons = list(data.get("by_person") or [])
@@ -1454,6 +1498,8 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
             person["name"] = prof["display_name"]
         person["regimen"] = infer_user_regimen(uid, emp_schedules, profiles)
         person["regimen_label"] = al.REGIMEN_LABELS.get(person["regimen"], person["regimen"])
+        if prof.get("sede_id"):
+            person["sede"] = sede_names.get(prof["sede_id"]) or person.get("sede")
 
     for extra in get_users(sede_id=sede_id):
         uid = str(extra.get("user_id") or "")
