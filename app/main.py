@@ -174,6 +174,16 @@ class ApplyScheduleRequest(BaseModel):
     user_ids: list[str] | None = None
 
 
+class ApplyRegimenScheduleRequest(BaseModel):
+    regimen: str
+    entry_time: str = "08:00"
+    exit_time: str = "17:00"
+    lunch_start: str = "12:00"
+    lunch_end: str = "14:30"
+    schedule_kind: str = "split"
+    skip_custom: bool = True
+
+
 class PunchRemedyCreate(BaseModel):
     user_id: str
     work_date: str
@@ -483,6 +493,31 @@ def apply_schedule_to_employees(sede_id: int, data: ApplyScheduleRequest):
             message = f"Horario de sede aplicado a {result['affected']} empleado(s)."
     else:
         message = f"Horario copiado como personalizado a {result['affected']} empleado(s)."
+    return {"message": message, **result}
+
+
+@app.post("/api/schedules/apply-regimen")
+def apply_schedule_regimen(data: ApplyRegimenScheduleRequest):
+    try:
+        result = db.apply_schedule_to_regimen(
+            data.regimen,
+            {
+                "entry_time": data.entry_time,
+                "exit_time": data.exit_time,
+                "lunch_start": data.lunch_start,
+                "lunch_end": data.lunch_end,
+                "schedule_kind": data.schedule_kind,
+            },
+            skip_custom=data.skip_custom,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    skipped = result.get("skipped_custom") or 0
+    message = (
+        f"Horario asignado a {result['affected']} empleado(s) de {result['regimen_label']}."
+    )
+    if skipped:
+        message += f" No se tocó a {skipped} con horario personalizado."
     return {"message": message, **result}
 
 
@@ -1566,11 +1601,13 @@ def update_user_profile(user_id: str, data: UserProfileUpdate):
                         conn.disconnect()
                     except Exception:
                         pass
+    merged = False
     if new_id != current_id:
         try:
-            db.rename_user_id(current_id, new_id)
+            renamed = db.rename_user_id(current_id, new_id)
         except ValueError as exc:
             raise HTTPException(400, str(exc))
+        merged = bool(renamed.get("merged"))
         current_id = new_id
     saved = db.save_employee_profile(
         current_id,
@@ -1581,7 +1618,11 @@ def update_user_profile(user_id: str, data: UserProfileUpdate):
     )
     message = "Datos actualizados"
     if new_id != str(user_id):
-        message += f". ID cambiado a {new_id}"
+        message += (
+            f". Se unieron las fichas {user_id} y {new_id}"
+            if merged
+            else f". ID cambiado a {new_id}"
+        )
     if clock_results:
         message += " y enviado al reloj"
     return {"message": message, "profile": saved, "user_id": current_id, "clock": clock_results}

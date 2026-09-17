@@ -1072,8 +1072,23 @@
             <button class="btn btn-primary" onclick="saveSchedule()">💾 Guardar horario</button>
             <button class="btn btn-outline" type="button" onclick="applySedeSchedule('inherit')">Aplicar a la sede (excepto personalizados)</button>
           </div>
+          <div class="grid-2" style="margin-top:14px">
+            <div class="form-group">
+              <label>Asignar este horario por régimen</label>
+              <select id="sch-apply-regimen">
+                <option value="">— Elegir régimen —</option>
+                <option value="276">D.L. 276</option>
+                <option value="728">D.L. 728</option>
+                <option value="cas_indeterminado">CAS indeterminado</option>
+                <option value="cas_concurso">CAS concurso</option>
+              </select>
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end">
+              <button class="btn btn-outline" type="button" onclick="applyScheduleToRegimen()">Aplicar al régimen</button>
+            </div>
+          </div>
           <p style="font-size:12px;color:var(--muted);margin-top:12px">
-            Al aplicar, todos los de la sede usan este horario. <strong>Quienes ya tienen horario personalizado no se modifican.</strong>
+            Al aplicar a la sede o al régimen, <strong>no se modifica</strong> a quienes ya tienen horario personalizado.
           </p>
           <p style="font-size:12px;color:var(--muted);margin-top:8px" id="schedule-updated">—</p>
         </div>
@@ -1202,6 +1217,14 @@
               <option value="custom">Personalizado</option>
             </select>
           </div>
+          <div class="form-group" style="margin:0;min-width:140px">
+            <label>Ordenar</label>
+            <select id="users-sort" onchange="onUsersSortChange()">
+              <option value="name">Nombre</option>
+              <option value="user_id">ID</option>
+              <option value="sede_name">Sede</option>
+            </select>
+          </div>
           <span class="search-meta" id="users-count"></span>
           <div class="mode-toggle" style="margin:0">
             <button class="mode-btn active" id="users-view-list" type="button" onclick="setUsersView('list')">Lista</button>
@@ -1216,7 +1239,16 @@
         </div>
         <div class="table-wrap" id="users-table-wrap">
           <table>
-            <thead><tr><th></th><th>ID</th><th>DNI</th><th>Nombre</th><th>Sede / lugar</th><th>Reloj</th><th>Horario</th><th>Acciones</th></tr></thead>
+            <thead><tr>
+              <th></th>
+              <th style="cursor:pointer" onclick="sortUsers('user_id')">ID</th>
+              <th>DNI</th>
+              <th style="cursor:pointer" onclick="sortUsers('name')">Nombre</th>
+              <th style="cursor:pointer" onclick="sortUsers('sede_name')">Sede / lugar</th>
+              <th>Reloj</th>
+              <th>Horario</th>
+              <th>Acciones</th>
+            </tr></thead>
             <tbody id="users-tbody"><tr><td colspan="8" class="empty">Sincroniza un dispositivo o usa Descarga Local.</td></tr></tbody>
           </table>
         </div>
@@ -3304,6 +3336,29 @@ async function editSchedule(sedeId) {
   document.getElementById('schedule-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+async function applyScheduleToRegimen() {
+  const regimen = document.getElementById('sch-apply-regimen')?.value;
+  if (!regimen) return toast('Elija un régimen', 'error');
+  const label = document.getElementById('sch-apply-regimen')?.selectedOptions?.[0]?.text || regimen;
+  if (!confirm(`¿Asignar el horario actual a todo el personal de ${label}?\nNo se modificará a quienes ya tienen horario personalizado.`)) return;
+  try {
+    const r = await api('/api/schedules/apply-regimen', {
+      method: 'POST',
+      body: JSON.stringify({
+        regimen,
+        entry_time: document.getElementById('sch-entry').value,
+        exit_time: document.getElementById('sch-exit').value,
+        lunch_start: document.getElementById('sch-lunch-start').value,
+        lunch_end: document.getElementById('sch-lunch-end').value,
+        skip_custom: true,
+      }),
+    });
+    toast(r.message || 'Horario asignado al régimen');
+    loadUsers();
+    loadSchedulesPage();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
 async function applySedeSchedule(mode) {
   const sedeId = +document.getElementById('schedule-sede')?.value;
   const sedeName = document.getElementById('schedule-sede')?.selectedOptions?.[0]?.text || 'esta sede';
@@ -4417,6 +4472,8 @@ function exportXLSX(format = 'person', filterOpts = {}) {
 let allUsersList = [];
 let usersViewMode = 'list';
 let sedeSchedulesMap = {};
+let usersSortKey = 'name';
+let usersSortDir = 1;
 
 function setUsersView(mode) {
   usersViewMode = mode;
@@ -4470,9 +4527,9 @@ async function saveEmployeeProfile() {
   const push = !!document.getElementById('emp-prof-push')?.checked;
   if (newId !== employeeProfileEditing) {
     const ok = confirm(
-      push
-        ? `Se cambiará el ID ${employeeProfileEditing} a ${newId} en SATEC y se subirá al reloj. ¿Continuar?`
-        : `Se cambiará el ID ${employeeProfileEditing} a ${newId} solo en SATEC. ¿Continuar?`
+      `Si ${newId} ya existe, se unirán las fichas: las marcaciones de ${employeeProfileEditing} pasarán a ${newId}.` +
+      (push ? ' También se subirá al reloj.' : '') +
+      '\n¿Continuar?'
     );
     if (!ok) return;
   }
@@ -4723,8 +4780,37 @@ function renderUsersBySede(list) {
     </div>`).join('');
 }
 
+function sortUsers(key) {
+  if (usersSortKey === key) usersSortDir *= -1;
+  else { usersSortKey = key; usersSortDir = 1; }
+  const sel = document.getElementById('users-sort');
+  if (sel && ['user_id', 'name', 'sede_name'].includes(key)) sel.value = key;
+  filterUsers();
+}
+
+function onUsersSortChange() {
+  const key = document.getElementById('users-sort')?.value || 'name';
+  usersSortKey = key;
+  usersSortDir = 1;
+  filterUsers();
+}
+
+function sortedUsers(list) {
+  const key = usersSortKey || 'name';
+  const dir = usersSortDir || 1;
+  return list.slice().sort((a, b) => {
+    const av = a[key] ?? a.user_id ?? '';
+    const bv = b[key] ?? b.user_id ?? '';
+    if (key === 'user_id') {
+      const an = Number(av), bn = Number(bv);
+      if (!Number.isNaN(an) && !Number.isNaN(bn)) return (an - bn) * dir;
+    }
+    return String(av).localeCompare(String(bv), 'es', { numeric: true }) * dir;
+  });
+}
+
 function filterUsers() {
-  const filtered = getFilteredUsers();
+  const filtered = sortedUsers(getFilteredUsers());
   if (usersViewMode === 'group') {
     renderUsersBySede(filtered);
   } else {
@@ -4741,11 +4827,7 @@ async function loadUsers() {
     ]);
     employeeSchedulesMap = Object.fromEntries(empSchedules.map(s => [s.user_id, s]));
     sedeSchedulesMap = Object.fromEntries((schedules || []).map(s => [s.sede_id, s]));
-    allUsersList = rows.sort((a, b) => {
-      const sedeCmp = (a.sede_name || 'Sin sede').localeCompare(b.sede_name || 'Sin sede', 'es');
-      if (sedeCmp !== 0) return sedeCmp;
-      return (a.name || a.user_id).localeCompare(b.name || b.user_id, 'es');
-    });
+    allUsersList = rows;
     filterUsers();
   } catch (e) {
     document.getElementById('users-tbody').innerHTML = `<tr><td colspan="8">${e.message}</td></tr>`;

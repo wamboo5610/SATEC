@@ -1026,22 +1026,52 @@ def rename_user_id(old_user_id: str, new_user_id: str) -> dict:
     if not old or not new:
         raise ValueError("El ID no puede estar vacío")
     if old == new:
-        return {"old_user_id": old, "new_user_id": new, "changed": False}
+        return {"old_user_id": old, "new_user_id": new, "changed": False, "merged": False}
     with get_conn() as conn:
         exists = conn.execute(
             "SELECT 1 FROM users_cache WHERE user_id=? LIMIT 1",
             (new,),
+        ).fetchone() or conn.execute(
+            "SELECT 1 FROM employee_profiles WHERE user_id=? LIMIT 1",
+            (new,),
         ).fetchone()
-        if exists:
-            raise ValueError(f"Ya existe un personal con ID {new}")
+        merged = bool(exists)
         conn.execute("PRAGMA foreign_keys=OFF")
-        conn.execute("UPDATE attendance SET user_id=? WHERE user_id=?", (new, old))
-        conn.execute("UPDATE users_cache SET user_id=? WHERE user_id=?", (new, old))
-        conn.execute("UPDATE employee_schedules SET user_id=? WHERE user_id=?", (new, old))
-        conn.execute("UPDATE employee_profiles SET user_id=? WHERE user_id=?", (new, old))
+        conn.execute("UPDATE OR IGNORE attendance SET user_id=? WHERE user_id=?", (new, old))
+        conn.execute("DELETE FROM attendance WHERE user_id=?", (old,))
+        conn.execute("UPDATE OR IGNORE users_cache SET user_id=? WHERE user_id=?", (new, old))
+        conn.execute("DELETE FROM users_cache WHERE user_id=?", (old,))
+        if conn.execute("SELECT 1 FROM employee_schedules WHERE user_id=?", (new,)).fetchone():
+            conn.execute("DELETE FROM employee_schedules WHERE user_id=?", (old,))
+        else:
+            conn.execute("UPDATE employee_schedules SET user_id=? WHERE user_id=?", (new, old))
+        old_prof = conn.execute("SELECT * FROM employee_profiles WHERE user_id=?", (old,)).fetchone()
+        new_prof = conn.execute("SELECT * FROM employee_profiles WHERE user_id=?", (new,)).fetchone()
+        if old_prof and new_prof:
+            conn.execute(
+                """UPDATE employee_profiles SET
+                     dni=COALESCE(dni, ?),
+                     display_name=COALESCE(display_name, ?),
+                     sede_id=COALESCE(sede_id, ?),
+                     regimen=COALESCE(regimen, ?),
+                     updated_at=?
+                   WHERE user_id=?""",
+                (
+                    old_prof["dni"],
+                    old_prof["display_name"],
+                    old_prof["sede_id"],
+                    old_prof["regimen"],
+                    datetime.now().isoformat(timespec="seconds"),
+                    new,
+                ),
+            )
+            conn.execute("DELETE FROM employee_profiles WHERE user_id=?", (old,))
+        else:
+            conn.execute("UPDATE employee_profiles SET user_id=? WHERE user_id=?", (new, old))
         conn.execute("UPDATE employee_absences SET user_id=? WHERE user_id=?", (new, old))
-        conn.execute("UPDATE punch_remedies SET user_id=? WHERE user_id=?", (new, old))
-    return {"old_user_id": old, "new_user_id": new, "changed": True}
+        conn.execute("UPDATE OR IGNORE punch_remedies SET user_id=? WHERE user_id=?", (new, old))
+        conn.execute("DELETE FROM punch_remedies WHERE user_id=?", (old,))
+    return {"old_user_id": old, "new_user_id": new, "changed": True, "merged": merged}
 
 
 def devices_for_user(user_id: str) -> list[dict]:
@@ -1364,6 +1394,42 @@ def apply_sede_schedule_to_employees(sede_id: int, mode: str = "inherit", user_i
             )
         return {"affected": len(ids), "mode": "copy"}
     raise ValueError("Modo inválido")
+
+
+def apply_schedule_to_regimen(regimen: str, schedule: dict, *, skip_custom: bool = True) -> dict:
+    wanted = (regimen or "").strip()
+    if wanted not in al.REGIMEN_LABELS:
+        raise ValueError("Régimen no válido")
+    users = [u for u in get_users() if (u.get("regimen") or "sin_regimen") == wanted]
+    custom_ids = {str(s["user_id"]) for s in get_employee_schedules()}
+    affected = 0
+    skipped = 0
+    for user in users:
+        uid = str(user.get("user_id") or "")
+        if not uid:
+            continue
+        if skip_custom and uid in custom_ids:
+            skipped += 1
+            continue
+        save_employee_schedule(
+            uid,
+            user.get("name"),
+            entry_time=schedule.get("entry_time"),
+            exit_time=schedule.get("exit_time"),
+            lunch_start=schedule.get("lunch_start") or "",
+            lunch_end=schedule.get("lunch_end") or "",
+            grace_minutes=schedule.get("grace_minutes") or 0,
+            lunch_grace_minutes=schedule.get("lunch_grace_minutes") or 0,
+            schedule_kind=schedule.get("schedule_kind") or "split",
+            notes=f"Asignado por régimen {al.REGIMEN_LABELS.get(wanted, wanted)}",
+        )
+        affected += 1
+    return {
+        "affected": affected,
+        "skipped_custom": skipped,
+        "regimen": wanted,
+        "regimen_label": al.REGIMEN_LABELS.get(wanted, wanted),
+    }
 
 
 # --- Subsanaciones de marcaciones (RRHH) ---
