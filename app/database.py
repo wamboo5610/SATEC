@@ -751,6 +751,14 @@ def upsert_users(users, device_serial=None):
     return len(rows)
 
 
+def _names_same(a: str | None, b: str | None) -> bool:
+    ta = {t for t in (a or "").upper().replace(",", " ").replace(".", " ").split() if len(t) > 2}
+    tb = {t for t in (b or "").upper().replace(",", " ").replace(".", " ").split() if len(t) > 2}
+    if not ta or not tb:
+        return False
+    return len(ta & tb) >= 2
+
+
 def _sede_rank(sede_name: str, profile_sede_id=None, row_sede_id=None) -> int:
     if profile_sede_id and row_sede_id and int(profile_sede_id) == int(row_sede_id):
         return 100
@@ -773,21 +781,23 @@ def get_users(device_serial=None, sede_id=None):
             ).fetchall()
         else:
             rows = conn.execute("SELECT * FROM users_cache ORDER BY name").fetchall()
-        users = [dict(r) for r in rows]
+        users = [dict(r) for r in rows if not str(r["device_serial"] or "").startswith("EXCEL")]
     profiles = get_employee_profiles_map()
     sedes = {s["id"]: s["name"] for s in get_sedes()}
     device_map = get_device_serial_map()
     for user in users:
         uid = str(user.get("user_id") or "")
+        clock_name = user.get("name") or ""
         profile = profiles.get(uid) or {}
-        if profile.get("display_name"):
+        same_person = _names_same(profile.get("display_name"), clock_name) if profile.get("display_name") else False
+        if profile.get("display_name") and (not clock_name or same_person):
             user["name"] = profile["display_name"]
-        if profile.get("dni"):
+        if profile.get("dni") and (not clock_name or same_person):
             user["dni"] = profile["dni"]
-        if profile.get("sede_id"):
+        if profile.get("sede_id") and same_person:
             user["profile_sede_id"] = profile["sede_id"]
             user["profile_sede_name"] = sedes.get(profile["sede_id"])
-        if profile.get("regimen"):
+        if profile.get("regimen") and (not clock_name or same_person):
             user["regimen"] = profile["regimen"]
             user["regimen_label"] = al.REGIMEN_LABELS.get(profile["regimen"], profile["regimen"])
         dev = device_map.get(user.get("device_serial") or "", {})
@@ -803,15 +813,15 @@ def get_users(device_serial=None, sede_id=None):
             if not uid:
                 continue
             prev = best.get(uid)
+            if prev and not _names_same(prev.get("name"), user.get("name")):
+                best[f"{uid}::{user.get('device_serial')}"] = user
+                continue
             clock = {"device": user.get("device_name"), "sede": user.get("_device_sede")}
             if not prev or user["_rank"] > prev["_rank"]:
                 others = list((prev or {}).get("other_clocks") or [])
                 if prev:
                     others.append({"device": prev.get("device_name"), "sede": prev.get("_device_sede")})
                 user["other_clocks"] = others
-                if user.get("profile_sede_id"):
-                    user["sede_id"] = user["profile_sede_id"]
-                    user["sede_name"] = user.get("profile_sede_name") or user["sede_name"]
                 best[uid] = user
             else:
                 others = list(prev.get("other_clocks") or [])
@@ -1570,7 +1580,7 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
     have = {p.get("person_key") or f"{p['user_id']}::{p.get('sede_id') or 0}" for p in persons}
     users_all = get_users(sede_id=sede_id)
     cache_names = {
-        f"{u.get('user_id')}::{int(u.get('sede_id') or 0)}": u.get("name")
+        f"{u.get('user_id')}::{u.get('device_serial') or int(u.get('sede_id') or 0)}": u.get("name")
         for u in users_all
     }
 
@@ -1589,7 +1599,8 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
     for extra in users_all:
         uid = str(extra.get("user_id") or "")
         sede_id_p = int(extra.get("sede_id") or 0)
-        key = f"{uid}::{sede_id_p}"
+        serial = str(extra.get("device_serial") or "")
+        key = f"{uid}::{serial or sede_id_p}"
         if not uid or key in have:
             continue
         if user_id and str(user_id) not in (uid, str(extra.get("dni") or "")):
