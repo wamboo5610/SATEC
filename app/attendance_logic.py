@@ -859,17 +859,18 @@ def build_tardiness_report(
 ) -> list[dict]:
     """Agrupa marcaciones por empleado y día, calculando tardanzas del período."""
     inferred = infer_punch_types(rows)
-    by_day: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    by_day: dict[tuple[str, int, str], list[dict]] = defaultdict(list)
     sede_name_to_id = sede_name_to_id or {}
 
     for r in inferred:
         uid = str(r.get("user_id", ""))
         day = extract_date(r.get("timestamp", ""))
+        sede_id = int(r.get("sede_id") or 0)
         if uid and day:
-            by_day[(uid, day)].append(r)
+            by_day[(uid, sede_id, day)].append(r)
 
     report = []
-    for (uid, day), day_rows in sorted(by_day.items(), key=lambda x: (x[0][1], x[0][0])):
+    for (uid, sede_id, day), day_rows in sorted(by_day.items(), key=lambda x: (x[0][2], x[0][0], x[0][1])):
         sample = day_rows[0]
         sede_name = sample.get("sede_name") or "—"
         mini_summary = build_daily_summary(
@@ -889,7 +890,9 @@ def build_tardiness_report(
         report.append({
             "date": day,
             "user_id": uid,
+            "person_key": f"{uid}::{sede_id}",
             "user_name": person.get("user_name") or "",
+            "sede_id": sede_id or None,
             "sede_name": sede_name,
             "entrada": person.get("entrada"),
             "salida": person.get("salida"),
@@ -931,20 +934,26 @@ def aggregate_tardiness_report(
 
     total_late_days = sum(1 for r in laborable if r.get("tardanza_total_minutos", 0) > 0)
 
-    by_person: dict[str, dict] = defaultdict(lambda: {
-        "name": "", "sede": "", "entries": 0,
+    by_person: dict[tuple[str, int], dict] = defaultdict(lambda: {
+        "name": "", "sede": "", "sede_id": None, "entries": 0,
         "late_days": 0, "late_minutes": 0,
         "late_minutes_entrada": 0, "late_minutes_almuerzo": 0,
         "late_days_entrada": 0, "late_days_almuerzo": 0,
         "punctual_days": 0,
         "non_work_days": 0,
+        "last_punch": "",
     })
 
     for r in report:
-        uid = r["user_id"]
-        p = by_person[uid]
+        uid = str(r["user_id"])
+        sede_id = int(r.get("sede_id") or 0)
+        p = by_person[(uid, sede_id)]
         p["name"] = r.get("user_name") or p["name"]
         p["sede"] = r.get("sede_name") or p["sede"]
+        p["sede_id"] = r.get("sede_id") or p["sede_id"]
+        last = r.get("date") or ""
+        if last > (p["last_punch"] or ""):
+            p["last_punch"] = last
         if not r.get("dia_laborable", True):
             p["non_work_days"] += 1
             continue
@@ -978,10 +987,14 @@ def aggregate_tardiness_report(
         total_late_minutes_net += net
         total_tolerance_applied += applied
         avg = round(net / v["late_days"], 1) if v["late_days"] else 0
+        uid, sede_id = k
         by_person_list.append({
-            "user_id": k,
+            "user_id": uid,
+            "sede_id": sede_id or None,
+            "person_key": f"{uid}::{sede_id}",
             "name": v["name"],
             "sede": v["sede"],
+            "last_punch": v.get("last_punch") or "",
             "days_with_attendance": v["entries"],
             "punctual_days": v["punctual_days"],
             "late_days": v["late_days"],

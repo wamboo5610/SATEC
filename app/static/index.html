@@ -315,7 +315,7 @@
       </button>
       <button class="nav-btn" data-page="attendance" data-module="attendance" title="Control de asistencia">
         <span class="rail-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>
-        <span class="rail-label">Asistencia</span>
+        <span class="rail-label">Reporte de asistencia</span>
       </button>
       <button class="nav-btn" data-page="users" data-module="employees" title="Empleados">
         <span class="rail-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
@@ -582,7 +582,7 @@
 
     <!-- ATTENDANCE -->
     <section class="page" id="page-attendance">
-      <div class="page-header"><h2>Control de Asistencia</h2><p>Genera reportes de asistencia de forma rápida o con opciones avanzadas</p></div>
+      <div class="page-header"><h2>Reporte de asistencia</h2><p>Genera reportes de asistencia de forma rápida o con opciones avanzadas</p></div>
 
       <div class="mode-toggle">
         <button class="mode-btn active" id="mode-easy" type="button" onclick="setAttendanceMode('easy')">✨ Fácil</button>
@@ -958,15 +958,15 @@
         <div class="search-bar" style="margin-bottom:0">
           <div class="form-group" style="margin:0;min-width:150px">
             <label>Mes</label>
-            <input type="month" id="tard-month" onchange="tardinessPersonId='';loadTardinessCalendar()">
+            <input type="month" id="tard-month" onchange="tardinessPersonKey='';loadTardinessCalendar()">
           </div>
           <div class="form-group" style="margin:0;min-width:160px">
             <label>Sede</label>
-            <select id="tard-sede" onchange="tardinessPersonId='';loadTardinessCalendar()"><option value="">Todas</option></select>
+            <select id="tard-sede" onchange="tardinessPersonKey='';loadTardinessCalendar()"><option value="">Todas</option></select>
           </div>
           <div class="form-group" style="margin:0;min-width:170px">
             <label>Régimen</label>
-            <select id="tard-regimen" onchange="tardinessPersonId='';loadTardinessCalendar()">
+            <select id="tard-regimen" onchange="tardinessPersonKey='';loadTardinessCalendar()">
               <option value="">Todos</option>
               <option value="276">D.L. 276</option>
               <option value="728">D.L. 728</option>
@@ -986,6 +986,7 @@
           <button class="btn btn-outline btn-sm" type="button" onclick="loadTardinessCalendar()">🔄 Actualizar</button>
           <button class="btn btn-success btn-sm" type="button" onclick="exportTardinessCalendar()">📊 Excel</button>
         </div>
+        <p class="search-meta" id="tard-freshness" style="margin-top:10px"></p>
       </div>
       <div class="stats" style="margin:16px 0">
         <div class="stat-card accent"><div class="label">Empleados</div><div class="value" id="tard-kpi-persons">0</div></div>
@@ -1451,9 +1452,13 @@
         <option value="cas_concurso">CAS concurso</option>
       </select>
     </div>
+    <div class="form-group">
+      <label>Reloj destino</label>
+      <select id="emp-prof-clock"><option value="">Sede Principal (automático)</option></select>
+    </div>
     <label class="chk-label" style="margin:8px 0 12px">
       <input type="checkbox" id="emp-prof-push">
-      Subir ID y nombre al reloj de marcación
+      Subir ID y nombre al reloj elegido
     </label>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" type="button" onclick="closeEmployeeProfileModal()">Cancelar</button>
@@ -1576,7 +1581,7 @@ const PAGE_MODULE_MAP = {
 const PAGE_ORDER = ['dashboard', 'attendance', 'recursos', 'users', 'devices', 'more', 'excel', 'offline', 'sedes', 'schedules', 'internet', 'accounts', 'system'];
 const PAGE_TITLES = {
   dashboard: 'Inicio',
-  attendance: 'Control de Asistencia',
+  attendance: 'Reporte de asistencia',
   excel: 'Importar Excel',
   recursos: 'Tardanzas',
   offline: 'Descarga Local',
@@ -1604,7 +1609,7 @@ const ICO_SVG = {
 };
 const HOME_MODULES = [
   { page: 'devices', module: 'devices', icon: 'clock', tone: 'pink', title: 'Relojes biométricos', desc: 'Sincroniza usuarios y guarda marcaciones en la base local' },
-  { page: 'attendance', module: 'attendance', icon: 'list', tone: 'purple', title: 'Control de asistencia', desc: 'Reportes de marcaciones, tardanzas y Excel' },
+  { page: 'attendance', module: 'attendance', icon: 'list', tone: 'purple', title: 'Reporte de asistencia', desc: 'Reportes de marcaciones, tardanzas y Excel' },
   { page: 'users', module: 'employees', icon: 'people', tone: 'cyan', title: 'Empleados', desc: 'Personas registradas en los relojes, por sede' },
   { page: 'recursos', module: 'recursos', icon: 'timer', tone: 'pink', title: 'Tardanzas', desc: 'Calendario mensual de minutos por sede, régimen o persona' },
   { page: 'more', module: 'more', icon: 'file', tone: 'cyan', title: 'Más opciones', desc: 'Importar Excel y descarga local del reloj' },
@@ -2805,7 +2810,7 @@ async function loadExcelPage() {
 }
 
 let tardinessData = null;
-let tardinessPersonId = '';
+let tardinessPersonKey = '';
 let tardinessDay = '';
 
 function tardinessQuery(includePerson = false) {
@@ -2818,16 +2823,25 @@ function tardinessQuery(includePerson = false) {
   const regimen = document.getElementById('tard-regimen')?.value;
   if (sede) params.set('sede_id', sede);
   if (regimen) params.set('regimen', regimen);
-  if (includePerson && tardinessPersonId) params.set('user_id', tardinessPersonId);
+  if (includePerson && tardinessPersonKey) {
+    const p = selectedTardinessPerson();
+    if (p) params.set('user_id', p.user_id);
+  }
   return params;
 }
 
-function selectedTardinessPerson() {
-  return (tardinessData?.persons || []).find(p => String(p.user_id) === String(tardinessPersonId)) || null;
+function personKeyOf(p) {
+  return p?.person_key || `${p?.user_id || ''}::${p?.sede_id || 0}`;
 }
 
-function tardinessPersonLabel(uid, fallbackName) {
-  const p = (tardinessData?.persons || []).find(x => String(x.user_id) === String(uid));
+function selectedTardinessPerson() {
+  return (tardinessData?.persons || []).find(p => personKeyOf(p) === String(tardinessPersonKey)) || null;
+}
+
+function tardinessPersonLabel(uid, fallbackName, sedeId) {
+  const p = (tardinessData?.persons || []).find(x =>
+    String(x.user_id) === String(uid) && (sedeId == null || String(x.sede_id || 0) === String(sedeId || 0))
+  ) || (tardinessData?.persons || []).find(x => String(x.user_id) === String(uid));
   if (p) return p.name || uid;
   return fallbackName || uid;
 }
@@ -2849,21 +2863,22 @@ function renderTardinessPeople(persons) {
   list.forEach(p => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'tard-person' + (String(p.user_id) === String(tardinessPersonId) ? ' active' : '');
-    btn.dataset.userId = String(p.user_id);
+    btn.className = 'tard-person' + (personKeyOf(p) === String(tardinessPersonKey) ? ' active' : '');
+    btn.dataset.personKey = personKeyOf(p);
     const extraDni = p.dni && String(p.dni) !== String(p.user_id) ? ` · DNI ${p.dni}` : '';
+    const last = p.last_punch ? ` · hasta ${p.last_punch}` : '';
     btn.innerHTML =
       `<span class="mins">${p.late_minutes || 0} min</span>` +
       `<strong>${escapeHtml(p.name || p.user_id)}</strong>` +
-      `<span>${escapeHtml(p.sede || '—')} · ${escapeHtml(p.regimen_label || 'Sin régimen')} · ID ${escapeHtml(p.user_id)}${escapeHtml(extraDni)} · ${p.late_days || 0} día(s)</span>`;
-    btn.addEventListener('click', () => selectTardinessPerson(String(p.user_id)));
+      `<span>${escapeHtml(p.sede || '—')} · ${escapeHtml(p.regimen_label || 'Sin régimen')} · ID ${escapeHtml(p.user_id)}${escapeHtml(extraDni)} · ${p.late_days || 0} día(s)${escapeHtml(last)}</span>`;
+    btn.addEventListener('click', () => selectTardinessPerson(personKeyOf(p)));
     el.appendChild(btn);
   });
 }
 
 function tardinessDayClass(day, person) {
   if (day.holiday) return 'holiday';
-  if (day.justified && (!person || String(tardinessPersonId))) return 'justified';
+  if (day.justified && (!person || String(tardinessPersonKey))) return 'justified';
   const mins = person ? (person.days || {})[day.date] || 0 : (day.late_minutes || 0);
   if (mins >= 30) return 'heavy';
   if (mins > 0) return 'late';
@@ -2875,7 +2890,7 @@ function renderTardinessCalendar() {
   const el = document.getElementById('tard-cal');
   if (!tardinessData) { el.innerHTML = ''; return; }
   const heads = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-  const person = (tardinessData.persons || []).find(p => String(p.user_id) === String(tardinessPersonId));
+  const person = selectedTardinessPerson();
   const start = tardinessData.start_weekday || 0;
   const cells = [];
   for (let i = 0; i < start; i++) cells.push('<div class="tard-day empty"></div>');
@@ -2902,12 +2917,13 @@ function renderTardinessCalendar() {
 }
 
 function collectTardinessDetailRows() {
-  const selected = String(tardinessPersonId || '');
+  const selected = String(tardinessPersonKey || '');
   const rows = [];
   for (const day of tardinessData?.days || []) {
     if (tardinessDay && day.date !== tardinessDay) continue;
     for (const d of day.details || []) {
-      if (selected && String(d.user_id) !== selected) continue;
+      const key = d.person_key || `${d.user_id}::${d.sede_id || 0}`;
+      if (selected && key !== selected) continue;
       rows.push({ ...d, date: d.date || day.date });
     }
   }
@@ -2920,7 +2936,7 @@ function renderTardinessDayDetail() {
   const body = document.getElementById('tard-day-body');
   const title = document.getElementById('tard-day-title');
   const person = selectedTardinessPerson();
-  if (!tardinessData || (!tardinessDay && !tardinessPersonId)) { card.style.display = 'none'; return; }
+  if (!tardinessData || (!tardinessDay && !tardinessPersonKey)) { card.style.display = 'none'; return; }
   const rows = collectTardinessDetailRows();
   const day = (tardinessData.days || []).find(d => d.date === tardinessDay);
   let heading = person
@@ -2935,7 +2951,7 @@ function renderTardinessDayDetail() {
     <tr>
       <td>${escapeHtml(d.date || tardinessDay || '—')}</td>
       <td>${escapeHtml(d.user_id)}</td>
-      <td>${escapeHtml(tardinessPersonLabel(d.user_id, d.user_name))}</td>
+      <td>${escapeHtml(tardinessPersonLabel(d.user_id, d.user_name, d.sede_id))}</td>
       <td>${escapeHtml(d.sede_name || '—')}</td>
       <td>${formatTime(d.entrada)}</td>
       <td>${formatTime(d.salida_almuerzo)}</td>
@@ -2948,14 +2964,14 @@ function renderTardinessDayDetail() {
 
 function selectTardinessPerson(userId) {
   const next = String(userId || '');
-  tardinessPersonId = String(tardinessPersonId) === next ? '' : next;
+  tardinessPersonKey = String(tardinessPersonKey) === next ? '' : next;
   renderTardinessPeople(tardinessData?.persons || []);
   renderTardinessCalendar();
   renderTardinessDayDetail();
 }
 
 function clearTardinessPerson() {
-  tardinessPersonId = '';
+  tardinessPersonKey = '';
   tardinessDay = '';
   renderTardinessPeople(tardinessData?.persons || []);
   renderTardinessCalendar();
@@ -2996,6 +3012,14 @@ async function loadTardinessCalendar() {
     document.getElementById('tard-kpi-days').textContent = t.late_days ?? 0;
     document.getElementById('tard-kpi-late').textContent = t.late_persons ?? 0;
     document.getElementById('tard-cal-hint').textContent = 'Celdas: minutos del día. Verde = 0, ámbar = retraso, rojo = 30 min o más.';
+    const fresh = tardinessData.freshness || {};
+    const freshEl = document.getElementById('tard-freshness');
+    if (freshEl) {
+      const parts = (fresh.by_device || []).slice(0, 6).map(d => `${d.sede_name}: ${d.last_date || '—'}`);
+      const dl = fresh.last_download;
+      const dlTxt = dl ? ` Última descarga: ${dl.sede_name || ''} ${dl.device_ip || ''} (${String(dl.downloaded_at || '').slice(0, 16)}).` : '';
+      freshEl.textContent = (parts.length ? ('Datos en SATEC hasta — ' + parts.join(' · ') + '.') : 'Sin marcaciones cargadas.') + dlTxt + ' Si falta un día, sincronice o descargue el reloj.';
+    }
     renderTardinessPeople(tardinessData.persons || []);
     renderTardinessCalendar();
     renderTardinessDayDetail();
@@ -3011,7 +3035,8 @@ function exportTardinessCalendar() {
   const sedeSel = document.getElementById('tard-sede');
   const sedeName = sedeSel?.selectedOptions?.[0]?.text || '';
   let fname = `tardanzas_${monthVal || 'mes'}.xlsx`;
-  if (tardinessPersonId) fname = `tardanzas_dni_${tardinessPersonId}_${monthVal}.xlsx`;
+  const selectedPerson = selectedTardinessPerson();
+  if (selectedPerson) fname = `tardanzas_dni_${selectedPerson.user_id}_${monthVal}.xlsx`;
   else if (sedeSel?.value) fname = `tardanzas_sede_${(sedeName || 'sede').replace(/\s+/g, '_')}_${monthVal}.xlsx`;
   downloadAuthenticated('/api/reports/tardiness/monthly/export/xlsx?' + q.toString(), fname)
     .catch(e => toast(e.message, 'error'));
@@ -4547,6 +4572,13 @@ async function openEmployeeProfileModal(userId, name, dni, sedeId, regimen) {
     const sedes = await api('/api/sedes');
     document.getElementById('emp-prof-sede').innerHTML = '<option value="">Sin sede</option>' +
       sedes.map(s => `<option value="${s.id}" ${String(s.id)===String(sedeId)?'selected':''}>${s.name}</option>`).join('');
+    const clocks = await api(`/api/users/${encodeURIComponent(userId)}/clocks`);
+    const clockSel = document.getElementById('emp-prof-clock');
+    if (clockSel) {
+      clockSel.innerHTML = (clocks || []).map((d, i) =>
+        `<option value="${d.id}" ${i===0?'selected':''}>${d.sede_name || 'Sede'} · ${d.name || 'Reloj'} · ${d.ip || ''}</option>`
+      ).join('') || '<option value="">No hay reloj asociado</option>';
+    }
   } catch (e) { /* ignore */ }
   document.getElementById('employee-profile-modal').classList.add('open');
 }
@@ -4580,6 +4612,7 @@ async function saveEmployeeProfile() {
         sede_id: sedeVal ? +sedeVal : null,
         regimen: document.getElementById('emp-prof-regimen').value || 'sin_regimen',
         push_to_clock: push,
+        device_id: document.getElementById('emp-prof-clock')?.value ? +document.getElementById('emp-prof-clock').value : null,
       }),
     });
     toast(r.message || 'Datos actualizados');

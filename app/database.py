@@ -1074,6 +1074,16 @@ def rename_user_id(old_user_id: str, new_user_id: str) -> dict:
     return {"old_user_id": old, "new_user_id": new, "changed": True, "merged": merged}
 
 
+def _clock_priority(device: dict) -> int:
+    ip = str(device.get("ip") or "")
+    label = f"{device.get('sede_name') or ''} {device.get('name') or ''}".lower()
+    if ip.endswith(".7") or "principal" in label or "palacio" in label:
+        return 0
+    if "terminal" in label or ip.endswith(".205"):
+        return 2
+    return 1
+
+
 def devices_for_user(user_id: str) -> list[dict]:
     uid = str(user_id)
     with get_conn() as conn:
@@ -1083,18 +1093,21 @@ def devices_for_user(user_id: str) -> list[dict]:
                 "SELECT DISTINCT device_serial FROM users_cache WHERE user_id=? AND device_serial IS NOT NULL",
                 (uid,),
             ).fetchall()
-            if r["device_serial"]
+            if r["device_serial"] and not str(r["device_serial"]).startswith("EXCEL")
         ]
     devices = get_devices()
+    found = []
     if serials:
         wanted = set(serials)
-        found = [d for d in devices if d.get("serial") in wanted]
-        if found:
-            return found
-    sede_id = get_user_sede_id(uid)
-    if sede_id:
-        return [d for d in devices if d.get("sede_id") == sede_id and d.get("ip")]
-    return [d for d in devices if d.get("ip")]
+        found = [d for d in devices if d.get("serial") in wanted and d.get("ip")]
+    if not found:
+        sede_id = get_user_sede_id(uid)
+        if sede_id:
+            found = [d for d in devices if d.get("sede_id") == sede_id and d.get("ip")]
+        else:
+            found = [d for d in devices if d.get("ip")]
+    found.sort(key=_clock_priority)
+    return found
 
 
 def get_employee_absences(user_id: str | None = None, date_from: str | None = None, date_to: str | None = None):
@@ -1554,30 +1567,40 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
     wanted = (regimen or "").strip().lower()
     details = list(data.get("details") or [])
     persons = list(data.get("by_person") or [])
-    have = {str(p["user_id"]) for p in persons}
+    have = {p.get("person_key") or f"{p['user_id']}::{p.get('sede_id') or 0}" for p in persons}
+    users_all = get_users(sede_id=sede_id)
+    cache_names = {
+        f"{u.get('user_id')}::{int(u.get('sede_id') or 0)}": u.get("name")
+        for u in users_all
+    }
 
     for person in persons:
         uid = str(person["user_id"])
+        sede_id_p = int(person.get("sede_id") or 0)
+        person["person_key"] = person.get("person_key") or f"{uid}::{sede_id_p}"
         prof = profiles.get(uid) or {}
         person["dni"] = prof.get("dni") or uid
-        if prof.get("display_name"):
-            person["name"] = prof["display_name"]
+        cache_name = cache_names.get(person["person_key"])
+        if cache_name:
+            person["name"] = cache_name
         person["regimen"] = infer_user_regimen(uid, emp_schedules, profiles)
         person["regimen_label"] = al.REGIMEN_LABELS.get(person["regimen"], person["regimen"])
-        if prof.get("sede_id"):
-            person["sede"] = sede_names.get(prof["sede_id"]) or person.get("sede")
 
-    for extra in get_users(sede_id=sede_id):
+    for extra in users_all:
         uid = str(extra.get("user_id") or "")
-        if not uid or uid in have:
+        sede_id_p = int(extra.get("sede_id") or 0)
+        key = f"{uid}::{sede_id_p}"
+        if not uid or key in have:
             continue
         if user_id and str(user_id) not in (uid, str(extra.get("dni") or "")):
             continue
-        have.add(uid)
+        have.add(key)
         persons.append({
             "user_id": uid,
+            "sede_id": extra.get("sede_id"),
+            "person_key": key,
             "name": extra.get("name") or uid,
-            "sede": extra.get("profile_sede_name") or extra.get("sede_name") or "",
+            "sede": extra.get("sede_name") or "",
             "dni": extra.get("dni") or uid,
             "regimen": extra.get("regimen") or "sin_regimen",
             "regimen_label": extra.get("regimen_label") or al.REGIMEN_LABELS["sin_regimen"],
@@ -1585,6 +1608,7 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
             "late_days": 0,
             "days_with_attendance": 0,
             "punctual_days": 0,
+            "last_punch": "",
             "days": {},
         })
 
@@ -1593,11 +1617,15 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
         allowed = {str(p["user_id"]) for p in persons}
         details = [d for d in details if str(d.get("user_id")) in allowed]
 
-    names_by_id = {str(p["user_id"]): p.get("name") or str(p["user_id"]) for p in persons}
+    names_by_key = {
+        p.get("person_key") or f"{p['user_id']}::{p.get('sede_id') or 0}": p.get("name") or str(p["user_id"])
+        for p in persons
+    }
     for row in details:
-        uid = str(row.get("user_id") or "")
-        if uid in names_by_id:
-            row["user_name"] = names_by_id[uid]
+        key = row.get("person_key") or f"{row.get('user_id')}::{row.get('sede_id') or 0}"
+        row["person_key"] = key
+        if key in names_by_key:
+            row["user_name"] = names_by_key[key]
 
     last_day = monthrange(year, month)[1]
     holiday_names = get_holiday_names()
@@ -1622,7 +1650,9 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
             "details": [
                 {
                     "user_id": d.get("user_id"),
+                    "person_key": d.get("person_key") or f"{d.get('user_id')}::{d.get('sede_id') or 0}",
                     "user_name": d.get("user_name"),
+                    "sede_id": d.get("sede_id"),
                     "sede_name": d.get("sede_name"),
                     "tardanza_total_minutos": d.get("tardanza_total_minutos") or 0,
                     "tardanza_minutos": d.get("tardanza_minutos") or 0,
@@ -1645,8 +1675,10 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
 
     for person in persons:
         by_day = {}
+        pkey = person.get("person_key") or f"{person['user_id']}::{person.get('sede_id') or 0}"
         for d in details:
-            if str(d.get("user_id")) != str(person["user_id"]):
+            dkey = d.get("person_key") or f"{d.get('user_id')}::{d.get('sede_id') or 0}"
+            if dkey != pkey:
                 continue
             if not d.get("dia_laborable", True):
                 continue
@@ -1674,7 +1706,41 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
         "regimen_options": [{"id": k, "label": v} for k, v in al.REGIMEN_LABELS.items()],
         "days": days,
         "persons": persons,
+        "freshness": get_attendance_freshness(),
     }
+
+
+def get_attendance_freshness() -> dict:
+    mapping = get_device_serial_map()
+    rows = []
+    with get_conn() as conn:
+        for r in conn.execute(
+            "SELECT device_serial, MAX(timestamp) last_ts, COUNT(*) c FROM attendance GROUP BY device_serial"
+        ).fetchall():
+            serial = r["device_serial"] or ""
+            info = mapping.get(serial) or {}
+            last = str(r["last_ts"] or "")[:10]
+            if last.startswith("21"):
+                continue
+            rows.append({
+                "device_serial": serial,
+                "device_name": info.get("device_name") or serial,
+                "sede_name": info.get("sede_name") or "—",
+                "last_date": last,
+                "records": r["c"],
+            })
+        last_download = None
+        try:
+            dl = conn.execute(
+                "SELECT sede_name, device_ip, downloaded_at FROM offline_downloads ORDER BY downloaded_at DESC LIMIT 1"
+            ).fetchone()
+            if dl:
+                last_download = dict(dl)
+        except Exception:
+            last_download = None
+    rows.sort(key=lambda x: x["last_date"] or "", reverse=True)
+    latest = rows[0]["last_date"] if rows else ""
+    return {"latest": latest, "by_device": rows, "last_download": last_download}
 
 
 def get_punch_observations_report(

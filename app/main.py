@@ -1555,6 +1555,7 @@ class UserProfileUpdate(BaseModel):
     regimen: str | None = None
     new_user_id: str | None = None
     push_to_clock: bool = False
+    device_id: int | None = None
 
 
 class AbsenceCreate(BaseModel):
@@ -1576,6 +1577,13 @@ def update_user_profile(user_id: str, data: UserProfileUpdate):
     clock_results = []
     if data.push_to_clock:
         devices = db.devices_for_user(current_id)
+        if data.device_id:
+            chosen = [d for d in devices if d.get("id") == data.device_id]
+            if not chosen:
+                chosen = [d for d in db.get_devices() if d.get("id") == data.device_id]
+            devices = chosen
+        elif devices:
+            devices = devices[:1]
         if not devices:
             raise HTTPException(400, "No hay un reloj asociado a este personal para subir el ID")
         for device in devices:
@@ -1626,6 +1634,11 @@ def update_user_profile(user_id: str, data: UserProfileUpdate):
     if clock_results:
         message += " y enviado al reloj"
     return {"message": message, "profile": saved, "user_id": current_id, "clock": clock_results}
+
+
+@app.get("/api/users/{user_id}/clocks")
+def list_user_clocks(user_id: str):
+    return db.devices_for_user(user_id)
 
 
 @app.get("/api/users/{user_id}/absences")
