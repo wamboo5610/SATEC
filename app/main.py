@@ -1507,6 +1507,8 @@ def list_users(device_serial: str | None = None, sede_id: int | None = None):
         row["sede_id"] = row.get("profile_sede_id") or dev.get("sede_id")
         row["device_name"] = dev.get("device_name", row.get("device_serial") or "—")
         row["dni"] = row.get("dni") or row.get("user_id")
+        row["regimen"] = row.get("regimen") or "sin_regimen"
+        row["regimen_label"] = row.get("regimen_label") or "Sin régimen"
         enriched.append(row)
     return enriched
 
@@ -1515,6 +1517,9 @@ class UserProfileUpdate(BaseModel):
     dni: str | None = None
     display_name: str | None = None
     sede_id: int | None = None
+    regimen: str | None = None
+    new_user_id: str | None = None
+    push_to_clock: bool = False
 
 
 class AbsenceCreate(BaseModel):
@@ -1531,13 +1536,55 @@ class TardinessSettingsUpdate(BaseModel):
 
 @app.patch("/api/users/{user_id}")
 def update_user_profile(user_id: str, data: UserProfileUpdate):
+    current_id = str(user_id)
+    new_id = (data.new_user_id or "").strip() or current_id
+    clock_results = []
+    if data.push_to_clock:
+        devices = db.devices_for_user(current_id)
+        if not devices:
+            raise HTTPException(400, "No hay un reloj asociado a este personal para subir el ID")
+        for device in devices:
+            conn = None
+            try:
+                _, conn = zk.connect_device(device["ip"], device["port"], device["password"])
+                zk.safe_disable(conn)
+                clock_results.append({
+                    "device": device.get("name") or device.get("ip"),
+                    **zk.push_user_identity(
+                        conn,
+                        old_user_id=current_id,
+                        new_user_id=new_id,
+                        name=data.display_name or "",
+                    ),
+                })
+            except Exception as exc:
+                raise HTTPException(400, f"No se pudo actualizar el reloj {device.get('name') or device.get('ip')}: {zk.friendly_error(device.get('ip') or '', exc)}")
+            finally:
+                if conn:
+                    zk.safe_enable(conn)
+                    try:
+                        conn.disconnect()
+                    except Exception:
+                        pass
+    if new_id != current_id:
+        try:
+            db.rename_user_id(current_id, new_id)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        current_id = new_id
     saved = db.save_employee_profile(
-        user_id,
+        current_id,
         dni=data.dni,
         display_name=data.display_name,
         sede_id=data.sede_id,
+        regimen=data.regimen,
     )
-    return {"message": "Datos actualizados", "profile": saved}
+    message = "Datos actualizados"
+    if new_id != str(user_id):
+        message += f". ID cambiado a {new_id}"
+    if clock_results:
+        message += " y enviado al reloj"
+    return {"message": message, "profile": saved, "user_id": current_id, "clock": clock_results}
 
 
 @app.get("/api/users/{user_id}/absences")

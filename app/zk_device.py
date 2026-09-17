@@ -134,6 +134,30 @@ def fetch_users(conn):
     return users
 
 
+def push_user_identity(conn, *, old_user_id: str, new_user_id: str, name: str = "") -> dict:
+    """Actualiza el ID/nombre en el reloj conservando el uid interno (huellas/rostro)."""
+    old_id = str(old_user_id).strip()
+    new_id = str(new_user_id).strip()
+    users = fetch_users(conn)
+    match = next((u for u in users if str(u["user_id"]) == old_id), None)
+    if not match and new_id != old_id:
+        match = next((u for u in users if str(u["user_id"]) == new_id), None)
+    display = (name or (match or {}).get("name") or new_id)[:24]
+    privilege = const.USER_DEFAULT if const else 0
+    if match and match.get("privilege") == "Admin" and const:
+        privilege = const.USER_ADMIN
+    if match:
+        conn.set_user(
+            uid=int(match["uid"]),
+            name=display,
+            privilege=privilege,
+            user_id=new_id,
+        )
+        return {"ok": True, "action": "updated", "uid": match["uid"], "user_id": new_id, "name": display}
+    conn.set_user(name=display, privilege=privilege, user_id=new_id)
+    return {"ok": True, "action": "created", "user_id": new_id, "name": display}
+
+
 def fetch_attendance(conn, device_serial=None):
     records = []
     for att in conn.get_attendance():

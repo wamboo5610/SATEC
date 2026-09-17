@@ -304,26 +304,23 @@ def minutes_late(actual: datetime, expected: datetime) -> int:
 
 
 REGIMEN_LABELS = {
-    "administrativo": "Administrativo",
-    "personalizado": "Personalizado",
-    "especial": "Otro régimen",
-    "rotativo": "Turnos rotativos",
-    "nocturno": "Nocturno",
+    "276": "D.L. 276",
+    "728": "D.L. 728",
+    "cas_indeterminado": "CAS indeterminado",
+    "cas_concurso": "CAS concurso",
+    "sin_regimen": "Sin régimen",
 }
 
 
-def infer_regimen(schedule: dict | None) -> str:
+def infer_regimen(schedule: dict | None, profile: dict | None = None) -> str:
+    if profile and profile.get("regimen") in REGIMEN_LABELS and profile.get("regimen") != "sin_regimen":
+        return profile["regimen"]
     if not schedule:
-        return "administrativo"
+        return "sin_regimen"
     extras = extra_shifts_of(schedule)
     if extras:
-        return "rotativo"
-    kind = schedule_kind(schedule)
-    if kind == "overnight":
-        return "nocturno"
-    if kind == "block":
-        return "especial"
-    return "personalizado"
+        return "sin_regimen"
+    return "sin_regimen"
 
 
 def extra_shifts_of(schedule: dict | None) -> list[dict]:

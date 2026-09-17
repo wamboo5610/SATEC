@@ -316,9 +316,13 @@ def _migrate(conn):
             dni TEXT,
             display_name TEXT,
             sede_id INTEGER,
+            regimen TEXT,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    pcols = {r[1] for r in conn.execute("PRAGMA table_info(employee_profiles)").fetchall()}
+    if "regimen" not in pcols:
+        conn.execute("ALTER TABLE employee_profiles ADD COLUMN regimen TEXT")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS employee_absences (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -773,6 +777,9 @@ def get_users(device_serial=None, sede_id=None):
         if profile.get("sede_id"):
             user["profile_sede_id"] = profile["sede_id"]
             user["profile_sede_name"] = sedes.get(profile["sede_id"])
+        if profile.get("regimen"):
+            user["regimen"] = profile["regimen"]
+            user["regimen_label"] = al.REGIMEN_LABELS.get(profile["regimen"], profile["regimen"])
     return users
 
 
@@ -942,24 +949,79 @@ def get_employee_profiles_map() -> dict[str, dict]:
         return {str(r["user_id"]): dict(r) for r in rows}
 
 
-def save_employee_profile(user_id: str, *, dni=None, display_name=None, sede_id=None) -> dict:
+def save_employee_profile(user_id: str, *, dni=None, display_name=None, sede_id=None, regimen=None) -> dict:
     uid = str(user_id)
     now = datetime.now().isoformat(timespec="seconds")
     with get_conn() as conn:
         conn.execute(
-            """INSERT INTO employee_profiles (user_id, dni, display_name, sede_id, updated_at)
-               VALUES (?, ?, ?, ?, ?)
+            """INSERT INTO employee_profiles (user_id, dni, display_name, sede_id, regimen, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
                ON CONFLICT(user_id) DO UPDATE SET
                  dni=COALESCE(excluded.dni, employee_profiles.dni),
                  display_name=COALESCE(excluded.display_name, employee_profiles.display_name),
                  sede_id=COALESCE(excluded.sede_id, employee_profiles.sede_id),
+                 regimen=COALESCE(excluded.regimen, employee_profiles.regimen),
                  updated_at=excluded.updated_at""",
-            (uid, (dni or "").strip() or None, (display_name or "").strip() or None, sede_id, now),
+            (
+                uid,
+                (dni or "").strip() or None,
+                (display_name or "").strip() or None,
+                sede_id,
+                (regimen or "").strip() or None,
+                now,
+            ),
         )
         if display_name and display_name.strip():
             conn.execute("UPDATE users_cache SET name=? WHERE user_id=?", (display_name.strip(), uid))
         row = conn.execute("SELECT * FROM employee_profiles WHERE user_id=?", (uid,)).fetchone()
         return dict(row) if row else {"user_id": uid}
+
+
+def rename_user_id(old_user_id: str, new_user_id: str) -> dict:
+    old = str(old_user_id).strip()
+    new = str(new_user_id).strip()
+    if not old or not new:
+        raise ValueError("El ID no puede estar vacío")
+    if old == new:
+        return {"old_user_id": old, "new_user_id": new, "changed": False}
+    with get_conn() as conn:
+        exists = conn.execute(
+            "SELECT 1 FROM users_cache WHERE user_id=? LIMIT 1",
+            (new,),
+        ).fetchone()
+        if exists:
+            raise ValueError(f"Ya existe un personal con ID {new}")
+        conn.execute("PRAGMA foreign_keys=OFF")
+        conn.execute("UPDATE attendance SET user_id=? WHERE user_id=?", (new, old))
+        conn.execute("UPDATE users_cache SET user_id=? WHERE user_id=?", (new, old))
+        conn.execute("UPDATE employee_schedules SET user_id=? WHERE user_id=?", (new, old))
+        conn.execute("UPDATE employee_profiles SET user_id=? WHERE user_id=?", (new, old))
+        conn.execute("UPDATE employee_absences SET user_id=? WHERE user_id=?", (new, old))
+        conn.execute("UPDATE punch_remedies SET user_id=? WHERE user_id=?", (new, old))
+    return {"old_user_id": old, "new_user_id": new, "changed": True}
+
+
+def devices_for_user(user_id: str) -> list[dict]:
+    uid = str(user_id)
+    with get_conn() as conn:
+        serials = [
+            r["device_serial"]
+            for r in conn.execute(
+                "SELECT DISTINCT device_serial FROM users_cache WHERE user_id=? AND device_serial IS NOT NULL",
+                (uid,),
+            ).fetchall()
+            if r["device_serial"]
+        ]
+    devices = get_devices()
+    if serials:
+        wanted = set(serials)
+        found = [d for d in devices if d.get("serial") in wanted]
+        if found:
+            return found
+    sede_id = get_user_sede_id(uid)
+    if sede_id:
+        return [d for d in devices if d.get("sede_id") == sede_id and d.get("ip")]
+    return [d for d in devices if d.get("ip")]
 
 
 def get_employee_absences(user_id: str | None = None, date_from: str | None = None, date_to: str | None = None):
@@ -1367,9 +1429,10 @@ def get_monthly_tardiness_report(year: int, month: int, sede_id=None, device_id=
     return data
 
 
-def infer_user_regimen(user_id: str, emp_schedules: dict | None = None) -> str:
+def infer_user_regimen(user_id: str, emp_schedules: dict | None = None, profiles: dict | None = None) -> str:
     rec = (emp_schedules or get_schedules_by_user_id()).get(str(user_id))
-    return al.infer_regimen(rec)
+    prof = (profiles or get_employee_profiles_map()).get(str(user_id))
+    return al.infer_regimen(rec, prof)
 
 
 def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, regimen: str | None = None):
@@ -1377,13 +1440,42 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
 
     data = get_monthly_tardiness_report(year, month, sede_id=sede_id, user_id=user_id)
     emp_schedules = get_schedules_by_user_id()
+    profiles = get_employee_profiles_map()
     wanted = (regimen or "").strip().lower()
     details = list(data.get("details") or [])
     persons = list(data.get("by_person") or [])
+    have = {str(p["user_id"]) for p in persons}
 
     for person in persons:
-        person["regimen"] = infer_user_regimen(person["user_id"], emp_schedules)
+        uid = str(person["user_id"])
+        prof = profiles.get(uid) or {}
+        person["dni"] = prof.get("dni") or uid
+        if prof.get("display_name"):
+            person["name"] = prof["display_name"]
+        person["regimen"] = infer_user_regimen(uid, emp_schedules, profiles)
         person["regimen_label"] = al.REGIMEN_LABELS.get(person["regimen"], person["regimen"])
+
+    for extra in get_users(sede_id=sede_id):
+        uid = str(extra.get("user_id") or "")
+        if not uid or uid in have:
+            continue
+        if user_id and str(user_id) not in (uid, str(extra.get("dni") or "")):
+            continue
+        have.add(uid)
+        persons.append({
+            "user_id": uid,
+            "name": extra.get("name") or uid,
+            "sede": extra.get("profile_sede_name") or extra.get("sede_name") or "",
+            "dni": extra.get("dni") or uid,
+            "regimen": extra.get("regimen") or "sin_regimen",
+            "regimen_label": extra.get("regimen_label") or al.REGIMEN_LABELS["sin_regimen"],
+            "late_minutes": 0,
+            "late_days": 0,
+            "days_with_attendance": 0,
+            "punctual_days": 0,
+            "days": {},
+        })
+
     if wanted:
         persons = [p for p in persons if p.get("regimen") == wanted]
         allowed = {str(p["user_id"]) for p in persons}

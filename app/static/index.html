@@ -968,11 +968,11 @@
             <label>Régimen</label>
             <select id="tard-regimen" onchange="tardinessPersonId='';loadTardinessCalendar()">
               <option value="">Todos</option>
-              <option value="administrativo">Administrativo</option>
-              <option value="personalizado">Personalizado</option>
-              <option value="especial">Otro régimen</option>
-              <option value="rotativo">Turnos rotativos</option>
-              <option value="nocturno">Nocturno</option>
+              <option value="276">D.L. 276</option>
+              <option value="728">D.L. 728</option>
+              <option value="cas_indeterminado">CAS indeterminado</option>
+              <option value="cas_concurso">CAS concurso</option>
+              <option value="sin_regimen">Sin régimen</option>
             </select>
           </div>
           <div class="form-group" style="margin:0;flex:1;min-width:180px">
@@ -1405,9 +1405,24 @@
   <div class="modal-card">
     <h3>Actualizar datos</h3>
     <p style="font-size:13px;color:var(--muted);margin-bottom:14px" id="emp-prof-subtitle">—</p>
+    <div class="form-group"><label>ID en el reloj</label><input id="emp-prof-id" placeholder="ID de marcación"></div>
     <div class="form-group"><label>DNI</label><input id="emp-prof-dni" placeholder="Documento"></div>
     <div class="form-group"><label>Nombres</label><input id="emp-prof-name" placeholder="Apellidos y nombres"></div>
     <div class="form-group"><label>Lugar de marcación (sede)</label><select id="emp-prof-sede"></select></div>
+    <div class="form-group">
+      <label>Régimen laboral</label>
+      <select id="emp-prof-regimen">
+        <option value="sin_regimen">Sin régimen</option>
+        <option value="276">D.L. 276</option>
+        <option value="728">D.L. 728</option>
+        <option value="cas_indeterminado">CAS indeterminado</option>
+        <option value="cas_concurso">CAS concurso</option>
+      </select>
+    </div>
+    <label class="chk-label" style="margin:8px 0 12px">
+      <input type="checkbox" id="emp-prof-push">
+      Subir ID y nombre al reloj de marcación
+    </label>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" type="button" onclick="closeEmployeeProfileModal()">Cancelar</button>
       <button class="btn btn-primary btn-sm" type="button" onclick="saveEmployeeProfile()">Guardar</button>
@@ -2781,7 +2796,9 @@ function renderTardinessPeople(persons) {
   const q = (document.getElementById('tard-person-q')?.value || '').trim().toLowerCase();
   const list = (persons || []).filter(p => {
     if (!q) return true;
-    return String(p.user_id || '').toLowerCase().includes(q) || String(p.name || '').toLowerCase().includes(q);
+    const hay = [p.user_id, p.dni, p.name].map(v => String(v || '').toLowerCase());
+    const compact = q.replace(/^0+/, '');
+    return hay.some(v => v.includes(q) || (compact && v.includes(compact)));
   });
   if (!list.length) {
     el.innerHTML = '<div class="empty">Sin empleados para este filtro.</div>';
@@ -2791,7 +2808,7 @@ function renderTardinessPeople(persons) {
     <button type="button" class="tard-person ${String(p.user_id) === String(tardinessPersonId) ? 'active' : ''}" onclick="selectTardinessPerson('${p.user_id}')">
       <span class="mins">${p.late_minutes || 0} min</span>
       <strong>${p.name || p.user_id}</strong>
-      <span>${p.sede || '—'} · ${p.regimen_label || 'Administrativo'} · ${p.late_days || 0} día(s)</span>
+      <span>${p.sede || '—'} · ${p.regimen_label || 'Sin régimen'} · ID ${p.user_id}${p.dni && p.dni !== p.user_id ? ' · DNI ' + p.dni : ''} · ${p.late_days || 0} día(s)</span>
     </button>`).join('');
 }
 
@@ -4425,11 +4442,14 @@ function userHorarioBadge(userId, sedeId) {
 let employeeProfileEditing = null;
 let employeeAbsenceEditing = null;
 
-async function openEmployeeProfileModal(userId, name, dni, sedeId) {
+async function openEmployeeProfileModal(userId, name, dni, sedeId, regimen) {
   employeeProfileEditing = String(userId);
   document.getElementById('emp-prof-subtitle').textContent = `${name || userId} · ID ${userId}`;
+  document.getElementById('emp-prof-id').value = userId;
   document.getElementById('emp-prof-dni').value = dni || userId;
   document.getElementById('emp-prof-name').value = name || '';
+  document.getElementById('emp-prof-regimen').value = regimen || 'sin_regimen';
+  document.getElementById('emp-prof-push').checked = false;
   try {
     const sedes = await api('/api/sedes');
     document.getElementById('emp-prof-sede').innerHTML = '<option value="">Sin sede</option>' +
@@ -4445,17 +4465,31 @@ function closeEmployeeProfileModal() {
 
 async function saveEmployeeProfile() {
   if (!employeeProfileEditing) return;
+  const newId = document.getElementById('emp-prof-id').value.trim();
+  if (!newId) return toast('El ID no puede estar vacío', 'error');
+  const push = !!document.getElementById('emp-prof-push')?.checked;
+  if (newId !== employeeProfileEditing) {
+    const ok = confirm(
+      push
+        ? `Se cambiará el ID ${employeeProfileEditing} a ${newId} en SATEC y se subirá al reloj. ¿Continuar?`
+        : `Se cambiará el ID ${employeeProfileEditing} a ${newId} solo en SATEC. ¿Continuar?`
+    );
+    if (!ok) return;
+  }
   try {
     const sedeVal = document.getElementById('emp-prof-sede').value;
-    await api(`/api/users/${encodeURIComponent(employeeProfileEditing)}`, {
+    const r = await api(`/api/users/${encodeURIComponent(employeeProfileEditing)}`, {
       method: 'PATCH',
       body: JSON.stringify({
+        new_user_id: newId,
         dni: document.getElementById('emp-prof-dni').value.trim() || null,
         display_name: document.getElementById('emp-prof-name').value.trim() || null,
         sede_id: sedeVal ? +sedeVal : null,
+        regimen: document.getElementById('emp-prof-regimen').value || 'sin_regimen',
+        push_to_clock: push,
       }),
     });
-    toast('Datos actualizados');
+    toast(r.message || 'Datos actualizados');
     closeEmployeeProfileModal();
     loadUsers();
   } catch (e) { toast(e.message, 'error'); }
@@ -4553,7 +4587,7 @@ function userRowHtml(u) {
     <td style="font-size:12px;color:var(--muted)">${u.device_name || '—'}</td>
     <td>${userHorarioBadge(u.user_id, u.sede_id)}</td>
     <td style="white-space:nowrap">
-      <button class="btn btn-outline btn-sm" onclick='openEmployeeProfileModal(${JSON.stringify(u.user_id)}, ${JSON.stringify(u.name || "")}, ${JSON.stringify(u.dni || u.user_id)}, ${JSON.stringify(u.sede_id || "")})'>Datos</button>
+      <button class="btn btn-outline btn-sm" onclick='openEmployeeProfileModal(${JSON.stringify(u.user_id)}, ${JSON.stringify(u.name || "")}, ${JSON.stringify(u.dni || u.user_id)}, ${JSON.stringify(u.sede_id || "")}, ${JSON.stringify(u.regimen || "sin_regimen")})'>Datos</button>
       <button class="btn btn-outline btn-sm" onclick='openAbsenceModal(${JSON.stringify(u.user_id)}, ${JSON.stringify(u.name || "")})'>Permiso</button>
       <button class="btn btn-outline btn-sm" onclick="openEmployeeScheduleModal('${u.user_id}', '${safeName}')">Ver horario</button>
     </td>
@@ -4571,7 +4605,7 @@ function getFilteredUsers() {
     if (horario === 'custom' && !employeeSchedulesMap[u.user_id]) return false;
     if (horario === 'sede' && employeeSchedulesMap[u.user_id]) return false;
     if (!q) return true;
-    const hay = [u.user_id, u.name, u.sede_name, u.device_name].map(v => String(v || '').toLowerCase());
+    const hay = [u.user_id, u.dni, u.name, u.sede_name, u.device_name, u.regimen, u.regimen_label].map(v => String(v || '').toLowerCase());
     return hay.some(v => v.includes(q));
   });
 }
