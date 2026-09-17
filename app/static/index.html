@@ -1013,7 +1013,7 @@
         <h3 id="tard-day-title">Detalle del día</h3>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>ID</th><th>Nombre</th><th>Sede</th><th>Entrada mañana</th><th>Salida mañana</th><th>Entrada tarde</th><th>Salida tarde</th><th>Min.</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>ID</th><th>Nombre</th><th>Sede</th><th>Entrada mañana</th><th>Salida mañana</th><th>Entrada tarde</th><th>Salida tarde</th><th>Min.</th><th>Estado</th></tr></thead>
             <tbody id="tard-day-body"></tbody>
           </table>
         </div>
@@ -2808,7 +2808,7 @@ let tardinessData = null;
 let tardinessPersonId = '';
 let tardinessDay = '';
 
-function tardinessQuery() {
+function tardinessQuery(includePerson = false) {
   const monthVal = document.getElementById('tard-month')?.value || '';
   const [year, month] = monthVal.split('-');
   const params = new URLSearchParams();
@@ -2816,11 +2816,20 @@ function tardinessQuery() {
   if (month) params.set('month', month);
   const sede = document.getElementById('tard-sede')?.value;
   const regimen = document.getElementById('tard-regimen')?.value;
-  const person = tardinessPersonId || '';
   if (sede) params.set('sede_id', sede);
   if (regimen) params.set('regimen', regimen);
-  if (person) params.set('user_id', person);
+  if (includePerson && tardinessPersonId) params.set('user_id', tardinessPersonId);
   return params;
+}
+
+function selectedTardinessPerson() {
+  return (tardinessData?.persons || []).find(p => String(p.user_id) === String(tardinessPersonId)) || null;
+}
+
+function tardinessPersonLabel(uid, fallbackName) {
+  const p = (tardinessData?.persons || []).find(x => String(x.user_id) === String(uid));
+  if (p) return p.name || uid;
+  return fallbackName || uid;
 }
 
 function renderTardinessPeople(persons) {
@@ -2836,12 +2845,20 @@ function renderTardinessPeople(persons) {
     el.innerHTML = '<div class="empty">Sin empleados para este filtro.</div>';
     return;
   }
-  el.innerHTML = list.map(p => `
-    <button type="button" class="tard-person ${String(p.user_id) === String(tardinessPersonId) ? 'active' : ''}" onclick="selectTardinessPerson('${p.user_id}')">
-      <span class="mins">${p.late_minutes || 0} min</span>
-      <strong>${p.name || p.user_id}</strong>
-      <span>${p.sede || '—'} · ${p.regimen_label || 'Sin régimen'} · ID ${p.user_id}${p.dni && p.dni !== p.user_id ? ' · DNI ' + p.dni : ''} · ${p.late_days || 0} día(s)</span>
-    </button>`).join('');
+  el.innerHTML = '';
+  list.forEach(p => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tard-person' + (String(p.user_id) === String(tardinessPersonId) ? ' active' : '');
+    btn.dataset.userId = String(p.user_id);
+    const extraDni = p.dni && String(p.dni) !== String(p.user_id) ? ` · DNI ${p.dni}` : '';
+    btn.innerHTML =
+      `<span class="mins">${p.late_minutes || 0} min</span>` +
+      `<strong>${escapeHtml(p.name || p.user_id)}</strong>` +
+      `<span>${escapeHtml(p.sede || '—')} · ${escapeHtml(p.regimen_label || 'Sin régimen')} · ID ${escapeHtml(p.user_id)}${escapeHtml(extraDni)} · ${p.late_days || 0} día(s)</span>`;
+    btn.addEventListener('click', () => selectTardinessPerson(String(p.user_id)));
+    el.appendChild(btn);
+  });
 }
 
 function tardinessDayClass(day, person) {
@@ -2884,35 +2901,54 @@ function renderTardinessCalendar() {
     : tardinessData.month_label || 'Calendario';
 }
 
+function collectTardinessDetailRows() {
+  const selected = String(tardinessPersonId || '');
+  const rows = [];
+  for (const day of tardinessData?.days || []) {
+    if (tardinessDay && day.date !== tardinessDay) continue;
+    for (const d of day.details || []) {
+      if (selected && String(d.user_id) !== selected) continue;
+      rows.push({ ...d, date: d.date || day.date });
+    }
+  }
+  rows.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.user_id).localeCompare(String(b.user_id)));
+  return rows;
+}
+
 function renderTardinessDayDetail() {
   const card = document.getElementById('tard-day-card');
   const body = document.getElementById('tard-day-body');
   const title = document.getElementById('tard-day-title');
-  if (!tardinessData || !tardinessDay) { card.style.display = 'none'; return; }
+  const person = selectedTardinessPerson();
+  if (!tardinessData || (!tardinessDay && !tardinessPersonId)) { card.style.display = 'none'; return; }
+  const rows = collectTardinessDetailRows();
   const day = (tardinessData.days || []).find(d => d.date === tardinessDay);
-  if (!day) { card.style.display = 'none'; return; }
-  let rows = day.details || [];
-  if (tardinessPersonId) rows = rows.filter(r => String(r.user_id) === String(tardinessPersonId));
-  const extra = day.holiday ? ` · Feriado ${day.holiday_name || ''}` : (day.justified ? ' · Justificado' : '');
-  title.textContent = `${tardinessDay} · ${day.late_minutes || 0} min · ${rows.length} registro(s)${extra}`;
+  let heading = person
+    ? `${person.name || person.user_id} · ID ${person.user_id}`
+    : (tardinessDay || 'Detalle');
+  if (tardinessDay) heading += ` · ${tardinessDay}`;
+  else heading += ` · ${tardinessData.month_label || 'mes'}`;
+  if (day?.holiday) heading += ` · Feriado ${day.holiday_name || ''}`;
+  title.textContent = `${heading} · ${rows.length} registro(s)`;
   card.style.display = 'block';
   body.innerHTML = rows.map(d => `
     <tr>
-      <td>${d.user_id}</td>
-      <td>${d.user_name || '—'}</td>
-      <td>${d.sede_name || '—'}</td>
+      <td>${escapeHtml(d.date || tardinessDay || '—')}</td>
+      <td>${escapeHtml(d.user_id)}</td>
+      <td>${escapeHtml(tardinessPersonLabel(d.user_id, d.user_name))}</td>
+      <td>${escapeHtml(d.sede_name || '—')}</td>
       <td>${formatTime(d.entrada)}</td>
       <td>${formatTime(d.salida_almuerzo)}</td>
       <td>${formatTime(d.entrada_almuerzo)}</td>
       <td>${formatTime(d.salida)}</td>
       <td><strong>${d.tardanza_total_minutos || 0}</strong></td>
-      <td>${d.estado_asistencia || '—'}${d.holiday_name ? ' · ' + d.holiday_name : ''}${d.justificacion ? ' · ' + (d.justificacion.kind || 'permiso') : ''}</td>
-    </tr>`).join('') || `<tr><td colspan="9" class="empty">${day.holiday ? ('Feriado: ' + (day.holiday_name || '')) : 'Sin registros este día.'}</td></tr>`;
+      <td>${escapeHtml(d.estado_asistencia || '—')}${d.holiday_name ? ' · ' + escapeHtml(d.holiday_name) : ''}${d.justificacion ? ' · ' + escapeHtml(d.justificacion.kind || 'permiso') : ''}</td>
+    </tr>`).join('') || `<tr><td colspan="10" class="empty">${day?.holiday ? ('Feriado: ' + (day.holiday_name || '')) : 'Sin registros de esta persona en el período.'}</td></tr>`;
 }
 
 function selectTardinessPerson(userId) {
-  tardinessPersonId = String(tardinessPersonId) === String(userId) ? '' : String(userId);
-  tardinessDay = '';
+  const next = String(userId || '');
+  tardinessPersonId = String(tardinessPersonId) === next ? '' : next;
   renderTardinessPeople(tardinessData?.persons || []);
   renderTardinessCalendar();
   renderTardinessDayDetail();
@@ -2950,7 +2986,7 @@ async function loadTardinessCalendar() {
       sedeSel.innerHTML = '<option value="">Todas</option>' + sedes.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
       if (cur) sedeSel.value = cur;
     }
-    tardinessData = await api('/api/tardiness/calendar?' + tardinessQuery().toString());
+    tardinessData = await api('/api/tardiness/calendar?' + tardinessQuery(false).toString());
     const settings = tardinessData.settings || {};
     const tol = document.getElementById('tard-tolerance');
     if (tol) tol.checked = !!settings.tolerance_enabled;
@@ -2970,7 +3006,7 @@ async function loadTardinessCalendar() {
 }
 
 function exportTardinessCalendar() {
-  const q = tardinessQuery();
+  const q = tardinessQuery(true);
   const monthVal = document.getElementById('tard-month')?.value || '';
   const sedeSel = document.getElementById('tard-sede');
   const sedeName = sedeSel?.selectedOptions?.[0]?.text || '';

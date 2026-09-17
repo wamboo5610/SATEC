@@ -1593,6 +1593,12 @@ def get_tardiness_calendar(year: int, month: int, sede_id=None, user_id=None, re
         allowed = {str(p["user_id"]) for p in persons}
         details = [d for d in details if str(d.get("user_id")) in allowed]
 
+    names_by_id = {str(p["user_id"]): p.get("name") or str(p["user_id"]) for p in persons}
+    for row in details:
+        uid = str(row.get("user_id") or "")
+        if uid in names_by_id:
+            row["user_name"] = names_by_id[uid]
+
     last_day = monthrange(year, month)[1]
     holiday_names = get_holiday_names()
     absences = get_absences_lookup(data.get("date_from"), data.get("date_to"), user_id)
