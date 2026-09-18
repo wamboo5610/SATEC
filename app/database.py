@@ -646,7 +646,7 @@ def insert_attendance(records):
         return len(rows)
 
 
-def backfill_attendance_names(name_map: dict) -> int:
+def backfill_attendance_names(name_map: dict, device_serial: str | None = None) -> int:
     if not name_map:
         return 0
     updated = 0
@@ -655,10 +655,16 @@ def backfill_attendance_names(name_map: dict) -> int:
             label = (name or "").strip()
             if not label:
                 continue
-            cur = conn.execute(
-                "UPDATE attendance SET user_name=? WHERE user_id=? AND IFNULL(user_name,'') != ?",
-                (label, str(uid), label),
-            )
+            if device_serial:
+                cur = conn.execute(
+                    "UPDATE attendance SET user_name=? WHERE user_id=? AND device_serial=? AND IFNULL(user_name,'') != ?",
+                    (label, str(uid), device_serial, label),
+                )
+            else:
+                cur = conn.execute(
+                    "UPDATE attendance SET user_name=? WHERE user_id=? AND IFNULL(user_name,'') != ?",
+                    (label, str(uid), label),
+                )
             updated += cur.rowcount or 0
     return updated
 

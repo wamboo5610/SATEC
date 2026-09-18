@@ -1402,7 +1402,7 @@ def _pull_device_live(device_id: int) -> dict:
         for r in records:
             r["user_name"] = name_map.get(r["user_id"]) or r.get("user_name")
         inserted = db.insert_attendance(records)
-        names_updated = db.backfill_attendance_names(name_map)
+        names_updated = db.backfill_attendance_names(name_map, serial)
         db.record_device_sync(
             device_id,
             ok=True,
