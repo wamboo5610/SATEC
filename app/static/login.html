@@ -33,29 +33,42 @@
       gap: 12px;
       margin-bottom: 16px;
     }
+    .style-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+    .style-row .style-label {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: #5c6b78;
+    }
     .style-picker {
       display: flex;
       gap: 6px;
       padding: 4px;
       border-radius: 999px;
-      background: rgba(255,255,255,.16);
-      border: 1px solid rgba(255,255,255,.28);
-      backdrop-filter: blur(8px);
+      background: #ffffff;
+      border: 1px solid #c9d5ce;
+      box-shadow: 0 4px 14px rgba(12, 32, 28, .08);
     }
     .style-picker button {
       border: 0;
       background: transparent;
-      color: #f4faf7;
+      color: #16324f;
       font-family: inherit;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 700;
-      padding: 7px 12px;
+      padding: 8px 14px;
       border-radius: 999px;
       cursor: pointer;
     }
     .style-picker button[aria-pressed="true"] {
-      background: #fff;
-      color: #0d3b2e;
+      background: #16324f;
+      color: #ffffff;
     }
     .login-wrap { width: 100%; max-width: 440px; }
     .login-card {
@@ -172,20 +185,7 @@
         #121820;
       color: #f4f1e8;
     }
-    body[data-login-style="clasico"] .style-picker {
-      background: rgba(22, 40, 32, .08);
-      border-color: rgba(22, 40, 32, .16);
-    }
-    html[data-theme="dark"] body[data-login-style="clasico"] .style-picker {
-      background: rgba(255,255,255,.06);
-      border-color: rgba(255,255,255,.14);
-    }
-    body[data-login-style="clasico"] .style-picker button { color: #1c2430; }
-    html[data-theme="dark"] body[data-login-style="clasico"] .style-picker button { color: #f4f1e8; }
-    body[data-login-style="clasico"] .style-picker button[aria-pressed="true"] {
-      background: #16324f;
-      color: #f8f3e8;
-    }
+    body[data-login-style="clasico"] .style-row { margin-top: 4px; margin-bottom: 8px; }
     body[data-login-style="clasico"] .login-card {
       background: #fffdf8;
       color: #1c2430;
@@ -293,15 +293,6 @@
       background: var(--bg);
       justify-content: center;
     }
-    body[data-login-style="moderno"] .style-picker {
-      background: var(--surface2, rgba(0,0,0,.04));
-      border-color: var(--border);
-    }
-    body[data-login-style="moderno"] .style-picker button { color: var(--text); }
-    body[data-login-style="moderno"] .style-picker button[aria-pressed="true"] {
-      background: #12324f;
-      color: #fff;
-    }
     body[data-login-style="moderno"] .login-card {
       border-radius: 20px;
       box-shadow: none;
@@ -348,11 +339,6 @@
     </aside>
     <div class="login-stage">
       <div class="login-top">
-        <div class="style-picker" role="group" aria-label="Estilo de la pantalla de acceso">
-          <button type="button" data-style="institucional" aria-pressed="true">Institucional</button>
-          <button type="button" data-style="clasico" aria-pressed="false">Clásico</button>
-          <button type="button" data-style="moderno" aria-pressed="false">Moderno</button>
-        </div>
         <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema">
           <span id="theme-icon">🌙</span>
           <span id="theme-label">Oscuro</span>
@@ -366,6 +352,14 @@
             <p>Sistema de Reporte de Asistencia y Control</p>
           </div>
           <div class="card-body">
+            <div class="style-row">
+              <span class="style-label">Estilo de acceso</span>
+              <div class="style-picker" role="group" aria-label="Estilo de la pantalla de acceso">
+                <button type="button" data-style="institucional" aria-pressed="true">Institucional</button>
+                <button type="button" data-style="clasico" aria-pressed="false">Clásico</button>
+                <button type="button" data-style="moderno" aria-pressed="false">Moderno</button>
+              </div>
+            </div>
             <div class="logo">
               <img class="logo-img" src="/assets/icon.png" alt="SATEC">
               <div>

@@ -2240,7 +2240,10 @@ async def iclock_devicecmd(request: Request):
 async def login_page(request: Request):
     if auth.is_authenticated(request):
         return RedirectResponse("/")
-    return FileResponse(STATIC / "login.html")
+    return FileResponse(
+        STATIC / "login.html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache"},
+    )
 
 
 @app.get("/")

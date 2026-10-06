@@ -2,7 +2,7 @@
 
 APP_NAME = "SATEC"
 APP_TITLE = "Sistema de Reporte de Asistencia y Control"
-APP_VERSION = "2.9.9"
+APP_VERSION = "2.9.10"
 AUTHOR = "Wamb Groups"
 ORGANIZATION = "Wamb Groups"
 WINDOW_TITLE = f"{APP_NAME} — {APP_TITLE}  |  {AUTHOR}"

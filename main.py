@@ -201,7 +201,7 @@ def _keep_server() -> int:
 
 
 def open_desktop(port: int) -> int:
-    url = f"http://127.0.0.1:{port}/login"
+    url = f"http://127.0.0.1:{port}/login?v={APP_VERSION}"
     try:
         import webview
     except ImportError:
