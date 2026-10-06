@@ -315,6 +315,9 @@ def auth_status(request: Request):
         "authenticated": bool(user),
         "username": user,
         "must_change_password": bool(request.session.get("must_change_password")),
+        "author": AUTHOR,
+        "app_name": APP_NAME,
+        "app_title": APP_TITLE,
     }
 
 

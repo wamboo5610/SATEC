@@ -1,6 +1,6 @@
 # SATEC — Sistema de Reporte de Asistencia y Control
 
-Software de escritorio para PC. **WAMBOO TIC**.
+Software de escritorio para PC. **Wamb Groups**.
 
 SATEC controla asistencia laboral con relojes biométricos y reportes. No es el sistema web SISAT.
 

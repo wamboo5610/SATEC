@@ -1,1 +1,1 @@
-"""Capa de escritorio SATEC — WAMBOO TIC."""
+"""Capa de escritorio SATEC — Wamb Groups."""

@@ -3,31 +3,61 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Acceso — SATEC | WAMBOO TIC</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>Acceso — SATEC | Wamb Groups</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/theme.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Inter', sans-serif;
-      background:
-        linear-gradient(180deg, rgba(8, 32, 24, .58), rgba(8, 24, 48, .62)),
-        url('/assets/login-bg.jpg') center/cover no-repeat,
-        var(--bg);
       color: var(--text);
       min-height: 100vh;
+    }
+    .login-shell { min-height: 100vh; }
+    .brand-panel { display: none; }
+    .login-stage {
+      min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 24px 20px;
     }
-    .login-wrap { width: 100%; max-width: 420px; }
     .login-top {
+      width: 100%;
+      max-width: 460px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
     }
+    .style-picker {
+      display: flex;
+      gap: 6px;
+      padding: 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      border: 1px solid rgba(255,255,255,.28);
+      backdrop-filter: blur(8px);
+    }
+    .style-picker button {
+      border: 0;
+      background: transparent;
+      color: #f4faf7;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 7px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .style-picker button[aria-pressed="true"] {
+      background: #fff;
+      color: #0d3b2e;
+    }
+    .login-wrap { width: 100%; max-width: 440px; }
     .login-card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -39,25 +69,16 @@
       display: flex;
       align-items: center;
       gap: 14px;
-      margin-bottom: 28px;
+      margin-bottom: 26px;
     }
-    .logo-icon, .logo-img {
+    .logo-img {
       width: 56px;
       height: 56px;
-      border-radius: 18px;
+      border-radius: 16px;
       object-fit: cover;
-      box-shadow: 0 8px 18px rgba(8,64,168,.18);
+      box-shadow: 0 8px 18px rgba(8, 40, 32, .22);
     }
-    .logo-icon {
-      background: linear-gradient(135deg, #088830, #0840a8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 800;
-      color: #fff;
-    }
-    .logo h1 { font-size: 18px; font-weight: 800; line-height: 1.3; }
+    .logo h1 { font-size: 18px; font-weight: 800; line-height: 1.25; }
     .logo p { font-size: 13px; color: var(--muted); margin-top: 4px; }
     .form-group { margin-bottom: 16px; }
     .form-group label {
@@ -93,7 +114,6 @@
       cursor: pointer;
       background: linear-gradient(135deg, #088830, #0840a8);
       color: #fff;
-      transition: 0.15s;
       margin-top: 8px;
     }
     .btn:hover { filter: brightness(1.05); }
@@ -119,51 +139,266 @@
       color: var(--muted);
       line-height: 1.6;
       text-align: center;
+      overflow-wrap: anywhere;
+    }
+    .brand-kicker {
+      font-size: 11px;
+      letter-spacing: .14em;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: rgba(248, 243, 232, .72);
+      margin-bottom: 8px;
+    }
+    .card-mast { display: none; }
+
+    /* Institucional: fotografía de fondo y tarjeta centrada */
+    body[data-login-style="institucional"] {
+      background:
+        linear-gradient(180deg, rgba(8, 32, 24, .62), rgba(8, 24, 48, .68)),
+        url('/assets/login-bg.jpg') center/cover no-repeat,
+        var(--bg);
+    }
+
+    /* Clásico: formulario de entidad, sin fotografía */
+    body[data-login-style="clasico"] {
+      background:
+        radial-gradient(circle at top, rgba(184, 148, 74, .18), transparent 42%),
+        #f3efe4;
+      color: #1c2430;
+    }
+    html[data-theme="dark"] body[data-login-style="clasico"] {
+      background:
+        radial-gradient(circle at top, rgba(184, 148, 74, .16), transparent 40%),
+        #121820;
+      color: #f4f1e8;
+    }
+    body[data-login-style="clasico"] .style-picker {
+      background: rgba(22, 40, 32, .08);
+      border-color: rgba(22, 40, 32, .16);
+    }
+    html[data-theme="dark"] body[data-login-style="clasico"] .style-picker {
+      background: rgba(255,255,255,.06);
+      border-color: rgba(255,255,255,.14);
+    }
+    body[data-login-style="clasico"] .style-picker button { color: #1c2430; }
+    html[data-theme="dark"] body[data-login-style="clasico"] .style-picker button { color: #f4f1e8; }
+    body[data-login-style="clasico"] .style-picker button[aria-pressed="true"] {
+      background: #16324f;
+      color: #f8f3e8;
+    }
+    body[data-login-style="clasico"] .login-card {
+      background: #fffdf8;
+      color: #1c2430;
+      border-radius: 4px;
+      border: 1px solid #c8b48a;
+      box-shadow: 0 0 0 6px rgba(22, 50, 79, .06), 0 18px 40px rgba(28, 36, 48, .08);
+      padding: 0 0 28px;
+    }
+    html[data-theme="dark"] body[data-login-style="clasico"] .login-card {
+      background: #1a222c;
+      color: #f4f1e8;
+      border-color: #8d7344;
+    }
+    body[data-login-style="clasico"] .card-mast {
+      display: block;
+      background: #16324f;
+      color: #f8f3e8;
+      padding: 22px 28px 18px;
+      border-bottom: 3px solid #c4a04a;
+    }
+    body[data-login-style="clasico"] .card-mast h1 {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    body[data-login-style="clasico"] .card-mast p { color: rgba(248, 243, 232, .78); }
+    body[data-login-style="clasico"] .card-body { padding: 22px 28px 0; }
+    body[data-login-style="clasico"] .logo { display: none; }
+    body[data-login-style="clasico"] .form-group input {
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid #c8b48a;
+      border-radius: 0;
+      color: inherit;
+      padding-left: 0;
+    }
+    body[data-login-style="clasico"] .btn {
+      border-radius: 2px;
+      background: #16324f;
+      letter-spacing: .02em;
+    }
+    body[data-login-style="clasico"] .hint { margin-left: 28px; margin-right: 28px; }
+
+    /* Moderno: panel de marca a la izquierda y formulario a la derecha */
+    body[data-login-style="moderno"] { background: #0e1726; }
+    body[data-login-style="moderno"] .login-shell {
+      display: grid;
+      grid-template-columns: minmax(280px, 42%) 1fr;
+    }
+    body[data-login-style="moderno"] .brand-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 48px 40px;
+      color: #f4f7fb;
+      background:
+        radial-gradient(circle at 20% 15%, rgba(56, 189, 120, .35), transparent 36%),
+        linear-gradient(165deg, #0b3b2c 0%, #10233f 58%, #0b1730 100%);
+    }
+    body[data-login-style="moderno"] .brand-mark {
+      width: 84px;
+      height: 84px;
+      border-radius: 24px;
+      object-fit: cover;
+      box-shadow: 0 16px 40px rgba(0,0,0,.28);
+    }
+    body[data-login-style="moderno"] .brand-panel h2 {
+      font-size: 34px;
+      line-height: 1.15;
+      margin: 22px 0 10px;
+      max-width: 12ch;
+      overflow-wrap: break-word;
+    }
+    body[data-login-style="moderno"] .brand-panel .lead {
+      color: rgba(244, 247, 251, .78);
+      font-size: 15px;
+      max-width: 34ch;
+      line-height: 1.5;
+    }
+    body[data-login-style="moderno"] .brand-points {
+      margin-top: 28px;
+      display: grid;
+      gap: 10px;
+      font-size: 14px;
+    }
+    body[data-login-style="moderno"] .brand-points span {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    body[data-login-style="moderno"] .brand-points i {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #d4b15a;
+      display: inline-block;
+    }
+    body[data-login-style="moderno"] .brand-foot {
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: rgba(244, 247, 251, .62);
+    }
+    body[data-login-style="moderno"] .login-stage {
+      background: var(--bg);
+      justify-content: center;
+    }
+    body[data-login-style="moderno"] .style-picker {
+      background: var(--surface2, rgba(0,0,0,.04));
+      border-color: var(--border);
+    }
+    body[data-login-style="moderno"] .style-picker button { color: var(--text); }
+    body[data-login-style="moderno"] .style-picker button[aria-pressed="true"] {
+      background: #12324f;
+      color: #fff;
+    }
+    body[data-login-style="moderno"] .login-card {
+      border-radius: 20px;
+      box-shadow: none;
+    }
+    body[data-login-style="moderno"] .logo { display: none; }
+
+    @media (max-width: 860px) {
+      body[data-login-style="moderno"] .login-shell { display: block; }
+      body[data-login-style="moderno"] .brand-panel,
+      body[data-login-style="moderno"] .login-stage { min-width: 0; }
+      body[data-login-style="moderno"] .brand-panel { padding: 28px 22px 22px; }
+      body[data-login-style="moderno"] .brand-panel h2 { font-size: 26px; max-width: 16ch; }
+      body[data-login-style="moderno"] .brand-points { display: none; }
+      body[data-login-style="moderno"] { background: var(--bg); }
+      body[data-login-style="moderno"] .login-stage { min-height: auto; padding: 12px 12px 28px; width: 100%; }
     }
     @media (max-width: 480px) {
+      .login-stage { padding: 16px 12px 28px; }
+      .login-card, .login-wrap, .login-top { max-width: 100%; }
       .login-card { padding: 24px 20px; }
+      body[data-login-style="clasico"] .login-card { padding: 0 0 20px; }
+      body[data-login-style="clasico"] .card-mast,
+      body[data-login-style="clasico"] .card-body { padding-left: 20px; padding-right: 20px; }
+      body[data-login-style="clasico"] .hint { margin-left: 20px; margin-right: 20px; }
       .logo h1 { font-size: 16px; }
+      .style-picker button { padding: 7px 8px; }
     }
   </style>
 </head>
-<body>
-  <div class="login-wrap">
-    <div class="login-top">
-      <span style="font-size:12px;color:#f3faf6;font-weight:800;letter-spacing:.08em">SATEC · ESCRITORIO</span>
-      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema">
-        <span id="theme-icon">🌙</span>
-        <span id="theme-label">Oscuro</span>
-      </button>
-    </div>
-    <div class="login-card">
-      <div class="logo">
-        <img class="logo-img" src="/assets/icon.png" alt="SATEC">
-        <div>
-          <h1>SATEC — Sistema de Asistencia Técnico</h1>
-          <p>Aplicación de escritorio para PC</p>
+<body data-login-style="institucional">
+  <div class="login-shell">
+    <aside class="brand-panel">
+      <div>
+        <img class="brand-mark" src="/assets/icon.png" alt="SATEC">
+        <h2>Control de asistencia de la entidad</h2>
+        <p class="lead">Relojes, horarios, tardanzas y reportes en un solo escritorio.</p>
+        <div class="brand-points">
+          <span><i></i> Marcaciones por sede</span>
+          <span><i></i> Regímenes y horarios</span>
+          <span><i></i> Reportes para recursos humanos</span>
         </div>
       </div>
-      <div class="alert alert-error" id="login-error"></div>
-      <form id="login-form">
-        <div class="form-group">
-          <label for="username">Usuario</label>
-          <input id="username" name="username" autocomplete="username" required placeholder="Tu usuario">
+      <div class="brand-foot" data-brand>Wamb Groups</div>
+    </aside>
+    <div class="login-stage">
+      <div class="login-top">
+        <div class="style-picker" role="group" aria-label="Estilo de la pantalla de acceso">
+          <button type="button" data-style="institucional" aria-pressed="true">Institucional</button>
+          <button type="button" data-style="clasico" aria-pressed="false">Clásico</button>
+          <button type="button" data-style="moderno" aria-pressed="false">Moderno</button>
         </div>
-        <div class="form-group">
-          <label for="password">Contraseña</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="••••••••">
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema">
+          <span id="theme-icon">🌙</span>
+          <span id="theme-label">Oscuro</span>
+        </button>
+      </div>
+      <div class="login-wrap">
+        <div class="login-card">
+          <div class="card-mast">
+            <div class="brand-kicker">Acceso institucional</div>
+            <h1>SATEC</h1>
+            <p>Sistema de Reporte de Asistencia y Control</p>
+          </div>
+          <div class="card-body">
+            <div class="logo">
+              <img class="logo-img" src="/assets/icon.png" alt="SATEC">
+              <div>
+                <h1>SATEC — Sistema de Asistencia Técnico</h1>
+                <p>Aplicación de escritorio para la entidad</p>
+              </div>
+            </div>
+            <div class="alert alert-error" id="login-error"></div>
+            <form id="login-form">
+              <div class="form-group">
+                <label for="username">Usuario</label>
+                <input id="username" name="username" autocomplete="username" required placeholder="Tu usuario">
+              </div>
+              <div class="form-group">
+                <label for="password">Contraseña</label>
+                <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="••••••••">
+              </div>
+              <button class="btn" type="submit" id="login-btn">Ingresar al sistema</button>
+            </form>
+            <div class="hint">
+              Acceso restringido al personal autorizado.<br>
+              Si olvidaste tu contraseña, contacta al administrador del sistema.<br>
+              <strong style="color:inherit;display:inline-block;margin-top:8px">Autor: <span data-brand>Wamb Groups</span></strong>
+            </div>
+          </div>
         </div>
-        <button class="btn" type="submit" id="login-btn">Ingresar al sistema</button>
-      </form>
-      <div class="hint">
-        Acceso restringido al personal autorizado.<br>
-        Si olvidaste tu contraseña, contacta al administrador del sistema.<br>
-        <strong style="color:var(--text);display:inline-block;margin-top:8px">Autor: WAMBOO TIC</strong>
       </div>
     </div>
   </div>
 
   <script>
+    const STYLE_KEY = 'satec-login-style';
+
     function applyTheme(theme) {
       document.documentElement.setAttribute('data-theme', theme);
       localStorage.setItem('sca-theme', theme);
@@ -177,8 +412,32 @@
       applyTheme(current === 'dark' ? 'light' : 'dark');
     }
 
+    function applyLoginStyle(style) {
+      const allowed = ['institucional', 'clasico', 'moderno'];
+      if (!allowed.includes(style)) style = 'institucional';
+      document.body.setAttribute('data-login-style', style);
+      localStorage.setItem(STYLE_KEY, style);
+      document.querySelectorAll('.style-picker button').forEach(btn => {
+        btn.setAttribute('aria-pressed', btn.dataset.style === style ? 'true' : 'false');
+      });
+    }
+
     applyTheme(localStorage.getItem('sca-theme') || 'light');
+    const estiloUrl = new URLSearchParams(location.search).get('estilo');
+    applyLoginStyle(estiloUrl || localStorage.getItem(STYLE_KEY) || 'institucional');
     document.getElementById('theme-toggle').onclick = toggleTheme;
+    document.querySelectorAll('.style-picker button').forEach(btn => {
+      btn.onclick = () => applyLoginStyle(btn.dataset.style);
+    });
+
+    fetch('/api/auth/status', { credentials: 'same-origin' })
+      .then(res => res.ok ? res.json() : null)
+      .then(info => {
+        if (!info || !info.author) return;
+        document.querySelectorAll('[data-brand]').forEach(el => { el.textContent = info.author; });
+        document.title = `Acceso — SATEC | ${info.author}`;
+      })
+      .catch(() => {});
 
     document.getElementById('login-form').onsubmit = async (e) => {
       e.preventDefault();

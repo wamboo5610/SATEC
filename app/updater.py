@@ -27,6 +27,7 @@ ALLOWED_FILES = (
     "run.py",
     "requirements.txt",
     "INICIAR.bat",
+    "MANUAL_DE_USO_SATEC.docx",
 )
 SKIP_NAMES = {
     "__pycache__",
@@ -122,7 +123,7 @@ def is_newer(remote: str, local: str) -> bool:
 def _headers(token: str, accept: str = "application/vnd.github+json") -> dict[str, str]:
     headers = {
         "Accept": accept,
-        "User-Agent": "SATEC-WAMBOOTIC-Updater",
+        "User-Agent": "SATEC-WambGroups-Updater",
         "X-GitHub-Api-Version": "2022-11-28",
     }
     if token:
@@ -488,6 +489,7 @@ def _write_apply_script(stage: Path, pid: int) -> Path:
         'if exist "%STAGE%\\run.py" copy /Y "%STAGE%\\run.py" "%ROOT%\\run.py" >nul',
         'if exist "%STAGE%\\requirements.txt" copy /Y "%STAGE%\\requirements.txt" "%ROOT%\\requirements.txt" >nul',
         'if exist "%STAGE%\\INICIAR.bat" copy /Y "%STAGE%\\INICIAR.bat" "%ROOT%\\INICIAR.bat" >nul',
+        'if exist "%STAGE%\\MANUAL_DE_USO_SATEC.docx" copy /Y "%STAGE%\\MANUAL_DE_USO_SATEC.docx" "%ROOT%\\MANUAL_DE_USO_SATEC.docx" >nul',
         'if exist "%ROOT%\\herramientas" rmdir /s /q "%ROOT%\\herramientas" >nul 2>&1',
         'if exist "%ROOT%\\installer" rmdir /s /q "%ROOT%\\installer" >nul 2>&1',
         'if exist "%ROOT%\\INSTALAR.bat" del /q "%ROOT%\\INSTALAR.bat" >nul 2>&1',

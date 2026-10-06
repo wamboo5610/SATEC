@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SATEC — Sistema de Asistencia Técnico | WAMBOO TIC</title>
+  <title>SATEC — Sistema de Asistencia Técnico | Wamb Groups</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/theme.css">
   <style>
@@ -355,7 +355,7 @@
     </nav>
     <div class="sidebar-footer">
       <div class="author-kicker">Autor</div>
-      <div class="author-name">WAMBOO TIC</div>
+      <div class="author-name" data-brand>Wamb Groups</div>
       <div class="author-sub">Escritorio para PC · v2.4</div>
     </div>
   </aside>
@@ -414,7 +414,7 @@
     <section class="page active" id="page-dashboard">
       <div class="home-hero">
         <div class="welcome-card">
-          <div class="eyebrow">SATEC · WAMBOO TIC</div>
+          <div class="eyebrow">SATEC · <span data-brand>Wamb Groups</span></div>
           <h2>Hola, <span id="welcome-name">usuario</span></h2>
           <p>Elige un módulo para continuar. Sincroniza relojes, revisa asistencia o genera reportes.</p>
         </div>
@@ -1358,7 +1358,7 @@
     <section class="page" id="page-system">
       <div class="page-header">
         <h2>Sistema</h2>
-        <p>Actualiza SATEC y exporta o restaura la base de datos. Autor: WAMBOO TIC</p>
+        <p>Actualiza SATEC y exporta o restaura la base de datos. Autor: <span data-brand>Wamb Groups</span></p>
       </div>
       <div class="grid-2">
         <div class="card">
@@ -1532,7 +1532,7 @@
       asistencia multi-sede, tardanzas y reportes.
     </p>
     <p style="font-size:13px;margin-bottom:4px"><strong>Versión</strong> <span id="about-version">2.4.0</span></p>
-    <p style="font-size:13px;margin-bottom:4px"><strong>Autor</strong> WAMBOO TIC</p>
+    <p style="font-size:13px;margin-bottom:4px"><strong>Autor</strong> <span data-brand>Wamb Groups</span></p>
     <p style="font-size:12px;color:var(--muted);margin-top:12px">Las marcaciones quedan guardadas en este equipo. Cerrar la ventana no borra la base de datos.</p>
     <div class="modal-actions">
       <button class="btn btn-outline btn-sm" type="button" onclick="closeAboutModal(); showPage('system');">Sistema</button>
@@ -3501,6 +3501,10 @@ async function loadServerInfo() {
   try {
     serverInfo = await api('/api/server-info');
     if (serverInfo.is_desktop) document.body.classList.add('desktop-app');
+    if (serverInfo.author) {
+      document.querySelectorAll('[data-brand]').forEach(el => { el.textContent = serverInfo.author; });
+      document.title = `SATEC — Sistema de Asistencia Técnico | ${serverInfo.author}`;
+    }
     if (serverInfo.version) {
       const aboutVer = document.getElementById('about-version');
       if (aboutVer) aboutVer.textContent = serverInfo.version;

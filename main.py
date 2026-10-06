@@ -1,4 +1,4 @@
-"""SATEC — aplicación de escritorio para PC. Autor: WAMBOO TIC."""
+"""SATEC — aplicación de escritorio para PC. Autor: Wamb Groups."""
 
 from __future__ import annotations
 
